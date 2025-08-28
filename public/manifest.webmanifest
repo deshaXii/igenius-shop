@@ -1,7 +1,7 @@
 {
   "id": "/",
-  "name": "Mobile Repairs Shop",
-  "short_name": "Repairs",
+  "name": "IGenius Shop",
+  "short_name": "IGenius",
   "description": "إدارة محلات صيانة الموبايلات: الصيانات، الإشعارات، الفواتير، الفنيين.",
   "start_url": "/",
   "scope": "/",

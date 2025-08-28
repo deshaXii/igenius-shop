@@ -2,7 +2,7 @@ import { useEffect } from "react";
 
 const usePageTitle = (title) => {
   useEffect(() => {
-    document.title = `${title} | Aqsa System`;
+    document.title = `${title} | IGenius System`;
   }, [title]);
 };
 

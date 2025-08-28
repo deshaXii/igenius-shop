@@ -57,7 +57,7 @@ self.addEventListener("push", (event) => {
       return {};
     }
   })();
-  const title = data.title || "Aqsa Repair";
+  const title = data.title || "IGenius Shop";
   const body = data.body || data.message || "";
   const targetUrl = data.url || "/";
 

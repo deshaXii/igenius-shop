@@ -1,7 +1,7 @@
 import axios from "axios";
 import useAuthStore from "../auth/authStore";
 
-const BASE_URL = "https://mobile-repairs-shop-api.vercel.app/api/invoices";
+const BASE_URL = "https://igenius-shop-api.vercel.app/api/invoices";
 
 export const fetchDailyProfits = async (date) => {
   const { token } = useAuthStore.getState();

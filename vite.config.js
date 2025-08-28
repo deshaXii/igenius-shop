@@ -13,8 +13,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       devOptions: { enabled: true }, // مفيد للتجربة محلياً
       manifest: {
-        name: "Aqsa Device Repair",
-        short_name: "AqsaRepair",
+        name: "IGenius Repair Shop",
+        short_name: "IGenius Shop",
         lang: "ar",
         dir: "rtl",
         start_url: "/",

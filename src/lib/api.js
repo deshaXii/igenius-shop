@@ -3,8 +3,7 @@ import axios from "axios";
 
 const API = axios.create({
   baseURL:
-    import.meta.env.VITE_API_URL ||
-    "https://mobile-repairs-shop-api.vercel.app/api",
+    import.meta.env.VITE_API_URL || "https://igenius-shop-api.vercel.app/api",
   withCredentials: true, // ما بيضرش حتى لو مش بتستخدم كوكي
 });
 

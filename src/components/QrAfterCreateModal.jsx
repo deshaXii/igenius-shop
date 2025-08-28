@@ -282,7 +282,7 @@ export default function QrAfterCreateModal({
                 paid={Number(
                   repair?.paid ?? repair?.deposit ?? repair?.advance ?? 0
                 )}
-                logoUrl="/logos/aqsa.png"
+                logoUrl="/icons/icon-192.png"
                 qrDataUrl={qrSrc /* طباعة نفس الـ QR على الإيصال (اختياري) */}
               />
             </div>
