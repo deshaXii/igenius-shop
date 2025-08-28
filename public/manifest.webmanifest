@@ -1,0 +1,64 @@
+{
+  "id": "/",
+  "name": "Mobile Repairs Shop",
+  "short_name": "Repairs",
+  "description": "إدارة محلات صيانة الموبايلات: الصيانات، الإشعارات، الفواتير، الفنيين.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "dir": "rtl",
+  "lang": "ar-EG",
+  "orientation": "portrait-primary",
+  "theme_color": "#5751E1",
+  "background_color": "#FFFFFF",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "/icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "الصيانات",
+      "short_name": "الصيانات",
+      "url": "/repairs",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "الإشعارات",
+      "short_name": "إشعارات",
+      "url": "/notifications",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    },
+    {
+      "name": "الفواتير",
+      "short_name": "الفواتير",
+      "url": "/invoices",
+      "icons": [
+        {
+          "src": "/icons/icon-192.png",
+          "sizes": "192x192",
+          "type": "image/png"
+        }
+      ]
+    }
+  ],
+  "categories": ["business", "productivity"],
+  "prefer_related_applications": false
+}

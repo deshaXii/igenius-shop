@@ -1,0 +1,173 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: "Cairo", sans-serif;
+}
+
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 40px white inset !important;
+}
+@media (max-width: 640px) {
+  /* 
+  .dark table thead tr th:first-of-type,
+  .dark table tbody tr td:first-of-type {
+    position: sticky;
+    right: 0;
+    background: #1f2937;
+  }
+  table thead tr th:first-of-type,
+  table tbody tr td:first-of-type {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    color: #000;
+  } */
+  .date-filter input {
+    width: 91px;
+  }
+
+  .date-filter button {
+    width: 110px;
+    margin: 0;
+  }
+}
+.ul-list {
+  list-style-type: none;
+}
+
+.ul-list li {
+  display: inline-flex;
+  margin-top: 10px;
+  border: 1px solid #cccccc4a;
+  padding: 10px;
+  border-radius: 10px;
+  column-gap: 20px;
+}
+
+.ul-list li div {
+  display: flex;
+  column-gap: 10px;
+  color: #494949;
+  font-weight: bold;
+}
+nav.navbar a {
+  padding: 10px 8px;
+  background: #ababab;
+  border-radius: 5px;
+  color: #ffffff;
+}
+nav.navbar a.active {
+  background: #0098ec;
+  padding: 10px 8px;
+  border-radius: 5px;
+  color: #ffffff;
+}
+.dark input,
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark input:-webkit-autofill:active,
+.dark select {
+  background: #111827 !important;
+  -webkit-box-shadow: 0 0 0 40px #111827 inset !important;
+  color: #ffffff !important;
+}
+select {
+  outline: none;
+}
+.date-filters input {
+  width: 130px;
+}
+.dark nav.navbar a {
+  background: #1f2937;
+}
+
+.dark nav.navbar a.active {
+  background: #3b82f6;
+}
+
+input::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="7" viewBox="0 0 24 24"><path fill="%23FF0000" d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z"/></svg>')
+    no-repeat;
+  background-size: contain;
+  color: transparent; /* Hide the original icon */
+}
+.box-with-icon {
+  width: 100%;
+  .input-field {
+    width: 100%;
+  }
+  input {
+    border-top-left-radius: 0;
+    border-left: 1px solid #ccc;
+    border-bottom-left-radius: 0;
+    width: 100%;
+  }
+}
+.box-with-icon button {
+  border-radius: 10px;
+  border-top-right-radius: 0;
+  position: relative;
+  z-index: 2222;
+  border-bottom-right-radius: 0;
+  background: #f3f4f6;
+}
+
+.all-full-width > * {
+  flex: 1;
+}
+
+@media (max-width: 640px) {
+  .mobile-repairs-filters {
+    background: #333;
+    z-index: 9999;
+    width: calc(100% - 24px);
+    border: 1px solid #ccc;
+    bottom: -500px;
+    transition: bottom 0.3s ease-in-out;
+  }
+}
+
+.show-mobile-repairs-filter-btn {
+  transition: bottom 0.3s linear;
+}
+.mobile-repairs-filters.show {
+  bottom: 12px;
+}
+.date-filter {
+  display: flex;
+  column-gap: 5px;
+}
+
+.date-filter input {
+  width: 140px;
+}
+
+.skel {
+  position: relative;
+  overflow: hidden;
+}
+.skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  animation: skel-shimmer 1.2s infinite;
+}
+@keyframes skel-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
