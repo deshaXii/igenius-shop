@@ -177,3 +177,6 @@ input::-webkit-calendar-picker-indicator {
 .btn.sun-mode-button svg {
   fill: yellow;
 }
+.btn.moon-mode-button svg {
+  fill: darkslategray;
+}
