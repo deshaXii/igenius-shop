@@ -13,9 +13,7 @@
     }
   ],
   "rewrites": [
-    {
-      "rewrites": [{ "source": "/(.*)", "destination": "/" }]
-    },
+    { "source": "/(.*)", "destination": "/" },
     {
       "source": "/api/(.*)",
       "destination": "https://igenius-shop-api.vercel.app/api/$1"
