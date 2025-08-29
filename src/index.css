@@ -12,43 +12,6 @@ input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 40px white inset !important;
 }
-@media (max-width: 640px) {
-  /* 
-  .dark table thead tr th:first-of-type,
-  .dark table tbody tr td:first-of-type {
-    position: sticky;
-    right: 0;
-    background: #1f2937;
-  }
-  table thead tr th:first-of-type,
-  table tbody tr td:first-of-type {
-    position: sticky;
-    right: 0;
-    background: #fff;
-    color: #000;
-  } */
-  .date-filter input {
-    width: 91px;
-  }
-
-  .page-filter input,
-  .page-filter button,
-  .page-filter select {
-    font-size: 12px;
-  }
-
-  .repairs-parts-box thead tr th {
-    min-width: 130px;
-  }
-  .repairs-parts-box input.inp {
-    width: 100% !important;
-  }
-
-  .date-filter button {
-    width: 110px;
-    margin: 0;
-  }
-}
 .ul-list {
   list-style-type: none;
 }
@@ -181,5 +144,43 @@ input::-webkit-calendar-picker-indicator {
 @keyframes skel-shimmer {
   100% {
     transform: translateX(100%);
+  }
+}
+
+@media (max-width: 640px) {
+  /* 
+  .dark table thead tr th:first-of-type,
+  .dark table tbody tr td:first-of-type {
+    position: sticky;
+    right: 0;
+    background: #1f2937;
+  }
+  table thead tr th:first-of-type,
+  table tbody tr td:first-of-type {
+    position: sticky;
+    right: 0;
+    background: #fff;
+    color: #000;
+  } */
+  .date-filter input {
+    width: 91px;
+  }
+
+  .page-filter input,
+  .page-filter button,
+  .page-filter select {
+    font-size: 12px;
+  }
+
+  .repairs-parts-box thead tr th {
+    min-width: 130px;
+  }
+  .repairs-parts-box input.inp {
+    width: 100% !important;
+  }
+
+  .date-filter button {
+    width: 110px;
+    margin: 0;
   }
 }
