@@ -307,37 +307,71 @@ export default function SingleRepairPage() {
         {(repair.parts || []).length === 0 ? (
           <div className="opacity-70">لا توجد قطع</div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-right">
-                  <th className="p-2">الاسم</th>
-                  <th className="p-2">بواسطة</th>
-                  <th className="p-2">المورد</th>
-                  <th className="p-2">تاريخ الشراء</th>
-                  <th className="p-2">التكلفة</th>
-                </tr>
-              </thead>
-              <tbody>
-                {repair.parts.map((p, i) => (
-                  <tr
-                    key={i}
-                    className="odd:bg-gray-50 dark:odd:bg-gray-700/40"
-                  >
-                    <td className="p-2">{p.name || "—"}</td>
-                    <td className="p-2">{p.source || "—"}</td>
-                    <td className="p-2">{p.supplier || "—"}</td>
-                    <td className="p-2">
-                      {p.purchaseDate ? formatDate(p.purchaseDate) : "—"}
-                    </td>
-                    <td className="p-2">
-                      {typeof p.cost === "number" ? p.cost : "—"}
-                    </td>
+          <>
+            // Desktop Table
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-right">
+                    <th className="p-2">الاسم</th>
+                    <th className="p-2">بواسطة</th>
+                    <th className="p-2">المورد</th>
+                    <th className="p-2">تاريخ الشراء</th>
+                    <th className="p-2">التكلفة</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {repair.parts.map((p, i) => (
+                    <tr
+                      key={i}
+                      className="odd:bg-gray-50 dark:odd:bg-gray-700/40"
+                    >
+                      <td className="p-2">{p.name || "—"}</td>
+                      <td className="p-2">{p.source || "—"}</td>
+                      <td className="p-2">{p.supplier || "—"}</td>
+                      <td className="p-2">
+                        {p.purchaseDate ? formatDate(p.purchaseDate) : "—"}
+                      </td>
+                      <td className="p-2">
+                        {typeof p.cost === "number" ? p.cost : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            // Mobile Cards
+            <div className="space-y-2 sm:hidden">
+              {repair.parts.map((p, i) => (
+                <div
+                  key={i}
+                  className="p-3 rounded-lg bg-gray-100 dark:bg-gray-700"
+                >
+                  <div className="font-semibold mb-1">{p.name || "—"}</div>
+                  <div className="text-sm space-y-1">
+                    <div>
+                      <span className="opacity-70">بواسطة: </span>
+                      <span>{p.source || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="opacity-70">المورد: </span>
+                      <span>{p.supplier || "—"}</span>
+                    </div>
+                    <div>
+                      <span className="opacity-70">تاريخ الشراء: </span>
+                      <span>
+                        {p.purchaseDate ? formatDate(p.purchaseDate) : "—"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="opacity-70">التكلفة: </span>
+                      <span>{typeof p.cost === "number" ? p.cost : "—"}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
