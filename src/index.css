@@ -80,12 +80,11 @@ nav.navbar a.active {
   border-radius: 5px;
   color: #ffffff;
 }
-.dark input,
-.dark input:-webkit-autofill,
-.dark input:-webkit-autofill:hover,
-.dark input:-webkit-autofill:focus,
-.dark input:-webkit-autofill:active,
-.dark select {
+.dark .login input,
+.dark .login input:-webkit-autofill,
+.dark .login input:-webkit-autofill:hover,
+.dark .login input:-webkit-autofill:focus,
+.dark .login input:-webkit-autofill:active {
   background: #111827 !important;
   -webkit-box-shadow: 0 0 0 40px #111827 inset !important;
   color: #ffffff !important;

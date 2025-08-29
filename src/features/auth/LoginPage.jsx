@@ -22,7 +22,7 @@ const LoginPage = () => {
 
     try {
       const { data } = await axios.post(
-        "https://igenius-shop-api.vercel.app/api/auth/login",
+        "https://mobile-repairs-shop-api.vercel.app/api/auth/login",
         { username, password }
       );
 
@@ -42,7 +42,7 @@ const LoginPage = () => {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen p-4 bg-gray-50 dark:bg-gray-900">
+    <div className="login flex items-center justify-center min-h-screen p-4 bg-gray-50 dark:bg-gray-900">
       <form
         onSubmit={handleLogin}
         className="w-full max-w-md bg-white dark:bg-gray-800 shadow-md rounded px-6 py-8"
