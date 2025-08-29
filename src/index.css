@@ -98,17 +98,6 @@ input::-webkit-calendar-picker-indicator {
   flex: 1;
 }
 
-@media (max-width: 640px) {
-  .mobile-repairs-filters {
-    background: #333;
-    z-index: 9999;
-    width: calc(100% - 24px);
-    border: 1px solid #ccc;
-    bottom: -500px;
-    transition: bottom 0.3s ease-in-out;
-  }
-}
-
 .show-mobile-repairs-filter-btn {
   transition: bottom 0.3s linear;
 }
@@ -148,24 +137,17 @@ input::-webkit-calendar-picker-indicator {
 }
 
 @media (max-width: 640px) {
-  /* 
-  .dark table thead tr th:first-of-type,
-  .dark table tbody tr td:first-of-type {
-    position: sticky;
-    right: 0;
-    background: #1f2937;
-  }
-  table thead tr th:first-of-type,
-  table tbody tr td:first-of-type {
-    position: sticky;
-    right: 0;
-    background: #fff;
-    color: #000;
-  } */
   .date-filter input {
     width: 91px;
   }
-
+  .mobile-repairs-filters {
+    background: #333;
+    z-index: 9999;
+    width: calc(100% - 24px);
+    border: 1px solid #ccc;
+    bottom: -500px;
+    transition: bottom 0.3s ease-in-out;
+  }
   .page-filter input,
   .page-filter button,
   .page-filter select {
