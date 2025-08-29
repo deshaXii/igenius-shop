@@ -169,7 +169,6 @@ export default function NewRepairPage() {
               value={form.color}
               onChange={(e) => setField("color", e.target.value)}
               placeholder="ادخل اللون"
-              required
             />
             <div className="">
               <VoiceInput onText={(text) => setField("color", text)} />
@@ -197,7 +196,6 @@ export default function NewRepairPage() {
               value={form.price}
               onChange={(e) => setField("price", e.target.value)}
               placeholder="ادخل السعر المبدئي"
-              required
             />
             <div className="">
               <VoiceInput onText={(text) => setField("price", text)} />
@@ -207,6 +205,7 @@ export default function NewRepairPage() {
         <Field label="الفني المسؤول">
           <select
             value={form.technician}
+            required
             onChange={(e) => setField("technician", e.target.value)}
             className="inp w-full"
           >
@@ -219,11 +218,15 @@ export default function NewRepairPage() {
           </select>
         </Field>
         <Field label="ملاحظات">
-          <input
+          <InputField
+            className="inp w-full"
             value={form.notes}
             onChange={(e) => setField("notes", e.target.value)}
-            className="inp w-full"
+            placeholder="ادخل السعر المبدئي"
           />
+          <div className="">
+            <VoiceInput onText={(text) => setField("notes", text)} />
+          </div>
         </Field>
       </section>
 
