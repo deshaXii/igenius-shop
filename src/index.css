@@ -166,3 +166,14 @@ input::-webkit-calendar-picker-indicator {
     margin: 0;
   }
 }
+
+.btn.sun-mode-button svg,
+.btn.moon-mode-button svg {
+  width: 20px;
+  height: 20px;
+  fill: white;
+}
+
+.btn.sun-mode-button svg {
+  fill: yellow;
+}
