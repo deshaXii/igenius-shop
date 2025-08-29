@@ -14,12 +14,15 @@
   ],
   "rewrites": [
     {
+      "rewrites": [{ "source": "/(.*)", "destination": "/" }]
+    },
+    {
       "source": "/api/(.*)",
-      "destination": "https://your-backend-app.vercel.app/api/$1"
+      "destination": "https://igenius-shop-api.vercel.app/api/$1"
     },
     {
       "source": "/socket.io/(.*)",
-      "destination": "https://your-backend-app.vercel.app/socket.io/$1"
+      "destination": "https://igenius-shop-api.vercel.app/socket.io/$1"
     }
   ],
   "headers": [
