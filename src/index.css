@@ -31,6 +31,13 @@ input:-webkit-autofill:active {
     width: 91px;
   }
 
+  .sdsdsd thead tr th {
+    min-width: 130px;
+  }
+  input.inp {
+    width: 100% !important;
+  }
+
   .date-filter button {
     width: 110px;
     margin: 0;
@@ -114,7 +121,6 @@ input::-webkit-calendar-picker-indicator {
   border-radius: 10px;
   border-top-right-radius: 0;
   position: relative;
-  z-index: 2222;
   border-bottom-right-radius: 0;
   background: #f3f4f6;
 }
@@ -170,8 +176,4 @@ input::-webkit-calendar-picker-indicator {
   100% {
     transform: translateX(100%);
   }
-}
-
-.date-filter input {
-  width: 90px;
 }
