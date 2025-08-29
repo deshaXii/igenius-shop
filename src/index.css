@@ -31,6 +31,12 @@ input:-webkit-autofill:active {
     width: 91px;
   }
 
+  .page-filter input,
+  .page-filter button,
+  .page-filter select {
+    font-size: 12px;
+  }
+
   .repairs-parts-box thead tr th {
     min-width: 130px;
   }
