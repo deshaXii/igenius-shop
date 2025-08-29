@@ -196,7 +196,7 @@ export default function SingleRepairPage() {
 
       <section className="p-3 rounded-xl bg-white dark:bg-gray-800">
         <h2 className="font-semibold mb-2">التتبّع (QR)</h2>
-        <div className="grid md:grid-cols-3 gap-3 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-end">
           <Info
             label="مرّات فتح رابط التتبّع"
             value={repair?.publicTracking?.views ?? 0}
@@ -239,7 +239,7 @@ export default function SingleRepairPage() {
 
       {/* الحالة + التواريخ */}
       <section className="p-3 rounded-xl bg-white dark:bg-gray-800">
-        <div className="grid md:grid-cols-4 gap-3 items-end">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <label className="space-y-1">
             <div className="text-sm opacity-80">الحالة</div>
             <StatusSelect
@@ -285,7 +285,7 @@ export default function SingleRepairPage() {
       </section>
 
       {/* بيانات العميل والجهاز */}
-      <section className="p-3 rounded-xl bg-white dark:bg-gray-800 grid md:grid-cols-2 gap-3">
+      <section className="p-3 rounded-xl bg-white dark:bg-gray-800 grid grid-cols-2 gap-3">
         <Info label="العميل" value={repair.customerName || "—"} />
         <Info label="الهاتف" value={repair.phone || "—"} />
         <Info label="الجهاز" value={repair.deviceType || "—"} />
