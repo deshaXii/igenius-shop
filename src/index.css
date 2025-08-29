@@ -165,6 +165,11 @@ input::-webkit-calendar-picker-indicator {
     width: 110px;
     margin: 0;
   }
+  select.transition-colors {
+    width: 115px;
+    padding-right: 0;
+    font-size: 13px;
+  }
 }
 
 .btn.sun-mode-button svg,
