@@ -343,7 +343,7 @@ export default function AccountsPage() {
                   </span>
                 </div>
                 <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
-                  <KV k="صافي الربح" v={egp(Math.round(t.netProfit))} />
+                  <KV k="إجمالى الربح" v={egp(Math.round(t.netProfit))} />
                   <KV k="نصيب الفني" v={egp(Math.round(t.techShare))} />
                   <KV k="نصيب المحل" v={egp(Math.round(t.shopShare))} />
                 </div>
@@ -358,7 +358,7 @@ export default function AccountsPage() {
               <tr className="text-right">
                 <Th>الفني</Th>
                 <Th>عدد المسلّم</Th>
-                <Th>صافي الربح</Th>
+                <Th>إجمالي الربح</Th>
                 <Th>نصيب الفني</Th>
                 <Th>نصيب المحل</Th>
               </tr>
