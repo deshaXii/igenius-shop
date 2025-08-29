@@ -31,10 +31,10 @@ input:-webkit-autofill:active {
     width: 91px;
   }
 
-  .sdsdsd thead tr th {
+  .repairs-parts-box thead tr th {
     min-width: 130px;
   }
-  input.inp {
+  .repairs-parts-box input.inp {
     width: 100% !important;
   }
 
