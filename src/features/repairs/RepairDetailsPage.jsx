@@ -308,7 +308,7 @@ export default function SingleRepairPage() {
           <div className="opacity-70">لا توجد قطع</div>
         ) : (
           <>
-            // Desktop Table
+            {/* // Desktop Table */}
             <div className="hidden sm:block overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -340,7 +340,7 @@ export default function SingleRepairPage() {
                 </tbody>
               </table>
             </div>
-            // Mobile Cards
+            {/* // Mobile Cards */}
             <div className="space-y-2 sm:hidden">
               {repair.parts.map((p, i) => (
                 <div
@@ -349,21 +349,21 @@ export default function SingleRepairPage() {
                 >
                   <div className="font-semibold mb-1">{p.name || "—"}</div>
                   <div className="text-sm space-y-1">
-                    <div>
+                    <div className="flex justify-center">
                       <span className="opacity-70">بواسطة: </span>
                       <span>{p.source || "—"}</span>
                     </div>
-                    <div>
+                    <div className="flex justify-center">
                       <span className="opacity-70">المورد: </span>
                       <span>{p.supplier || "—"}</span>
                     </div>
-                    <div>
+                    <div className="flex justify-center">
                       <span className="opacity-70">تاريخ الشراء: </span>
                       <span>
                         {p.purchaseDate ? formatDate(p.purchaseDate) : "—"}
                       </span>
                     </div>
-                    <div>
+                    <div className="flex justify-center">
                       <span className="opacity-70">التكلفة: </span>
                       <span>{typeof p.cost === "number" ? p.cost : "—"}</span>
                     </div>
