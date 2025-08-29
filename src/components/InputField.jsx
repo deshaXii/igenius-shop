@@ -8,6 +8,7 @@ const InputField = ({
   onChange,
   placeholder,
   required,
+  disabled,
   className,
 }) => (
   <div className=" input-field">
@@ -15,6 +16,7 @@ const InputField = ({
     <input
       type={type}
       name={name}
+      disabled={disabled}
       value={value}
       onChange={onChange}
       placeholder={placeholder}

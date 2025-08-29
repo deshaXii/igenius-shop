@@ -8,6 +8,8 @@ import formatDate from "../../utils/formatDate";
 import statusOptions from "../../utils/statusOptions";
 import DeliveryModal from "../../components/DeliveryModal";
 import StatusSelect from "../../components/StatusSelect";
+import VoiceInput from "../../components/VoiceInput";
+import InputField from "../../components/InputField";
 
 export default function EditRepairPage() {
   const { id } = useParams();
@@ -312,63 +314,110 @@ export default function EditRepairPage() {
 
       {/* الحقول العامة */}
       <section className="p-3 rounded-xl bg-white dark:bg-gray-800 grid md:grid-cols-2 gap-4">
-        <Field label="اسم العميل">
-          <input
+        <div className="relative flex items-center justify-center box-with-icon">
+          <InputField
+            className="inp w-full"
             value={form.customerName}
+            disabled={!canEditAll}
             onChange={(e) => setField("customerName", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
+            placeholder="ادخل اسم العميل"
+            required
           />
-        </Field>
+          <div className="">
+            <VoiceInput onText={(text) => setField("customerName", text)} />
+          </div>
+        </div>
         <Field label="هاتف">
-          <input
-            value={form.phone}
-            onChange={(e) => setField("phone", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
-          />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              value={form.phone}
+              disabled={!canEditAll}
+              onChange={(e) => setField("phone", e.target.value)}
+              placeholder="ادخل رقم العميل"
+              required
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("phone", text)} />
+            </div>
+          </div>
         </Field>
         <Field label="نوع الجهاز">
-          <input
-            value={form.deviceType}
-            onChange={(e) => setField("deviceType", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
-          />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              value={form.deviceType}
+              disabled={!canEditAll}
+              onChange={(e) => setField("deviceType", e.target.value)}
+              placeholder="ادخل نوع الجهاز"
+              required
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("deviceType", text)} />
+            </div>
+          </div>
         </Field>
         <Field label="اللون">
-          <input
-            value={form.color}
-            onChange={(e) => setField("color", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
-          />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              value={form.color}
+              disabled={!canEditAll}
+              onChange={(e) => setField("color", e.target.value)}
+              placeholder="ادخل لون الجهاز"
+              required
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("color", text)} />
+            </div>
+          </div>
         </Field>
         <Field label="العطل">
-          <input
-            value={form.issue}
-            onChange={(e) => setField("issue", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
-          />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              value={form.issue}
+              disabled={!canEditAll}
+              onChange={(e) => setField("issue", e.target.value)}
+              placeholder="ادخل العطل"
+              required
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("issue", text)} />
+            </div>
+          </div>
         </Field>
         <Field label="السعر المتفق عليه">
-          <input
-            type="number"
-            value={form.price}
-            onChange={(e) => setField("price", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
-          />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              type="number"
+              value={form.price}
+              disabled={!canEditAll}
+              onChange={(e) => setField("price", e.target.value)}
+              placeholder="ادخل السعر المبدئي"
+              required
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("price", text)} />
+            </div>
+          </div>
         </Field>
         <Field label="السعر النهائي">
-          <input
-            type="number"
-            value={form.finalPrice}
-            onChange={(e) => setField("finalPrice", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
-          />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              type="number"
+              value={form.finalPrice}
+              disabled={!canEditAll}
+              onChange={(e) => setField("finalPrice", e.target.value)}
+              placeholder="ادخل السعر النهائي"
+              required
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("finalPrice", text)} />
+            </div>
+          </div>
         </Field>
         <Field label="الفني المسؤول">
           <select
@@ -386,12 +435,19 @@ export default function EditRepairPage() {
           </select>
         </Field>
         <Field label="ملاحظات">
-          <input
-            value={form.notes}
-            onChange={(e) => setField("notes", e.target.value)}
-            className="inp w-full"
-            disabled={!canEditAll}
-          />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              value={form.notes}
+              disabled={!canEditAll}
+              onChange={(e) => setField("notes", e.target.value)}
+              placeholder="ادخل ملاحظاتك"
+              required
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("notes", text)} />
+            </div>
+          </div>
         </Field>
       </section>
 

@@ -218,14 +218,16 @@ export default function NewRepairPage() {
           </select>
         </Field>
         <Field label="ملاحظات">
-          <InputField
-            className="inp w-full"
-            value={form.notes}
-            onChange={(e) => setField("notes", e.target.value)}
-            placeholder="ادخل السعر المبدئي"
-          />
-          <div className="">
-            <VoiceInput onText={(text) => setField("notes", text)} />
+          <div className="relative flex items-center justify-center box-with-icon">
+            <InputField
+              className="inp w-full"
+              value={form.notes}
+              onChange={(e) => setField("notes", e.target.value)}
+              placeholder="ادخل السعر المبدئي"
+            />
+            <div className="">
+              <VoiceInput onText={(text) => setField("notes", text)} />
+            </div>
           </div>
         </Field>
       </section>
