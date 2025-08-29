@@ -80,11 +80,12 @@ nav.navbar a.active {
   border-radius: 5px;
   color: #ffffff;
 }
-.dark .login input,
-.dark .login input:-webkit-autofill,
-.dark .login input:-webkit-autofill:hover,
-.dark .login input:-webkit-autofill:focus,
-.dark .login input:-webkit-autofill:active {
+.dark input:not([type="checkbox"]),
+.dark input:not([type="checkbox"]):-webkit-autofill,
+.dark input:not([type="checkbox"]):-webkit-autofill:hover,
+.dark input:not([type="checkbox"]):-webkit-autofill:focus,
+.dark input:not([type="checkbox"]):-webkit-autofill:active,
+.dark select {
   background: #111827 !important;
   -webkit-box-shadow: 0 0 0 40px #111827 inset !important;
   color: #ffffff !important;
