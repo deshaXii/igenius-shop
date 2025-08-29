@@ -563,7 +563,7 @@ function TransactionsBlock({ startDate, endDate }) {
               return (
                 <article
                   key={t._id}
-                  className="p-3 rounded-xl border border-gray-200 dark:border-gray-700"
+                  className="relative p-3 rounded-xl border border-gray-200 dark:border-gray-700"
                 >
                   <div className="flex items-center justify-between">
                     <span
@@ -586,7 +586,7 @@ function TransactionsBlock({ startDate, endDate }) {
                   {!!t.description && (
                     <div className="mt-1 text-sm">{t.description}</div>
                   )}
-                  <div className="mt-2">
+                  <div className="absolute top-[10px] left-[10px]">
                     <button
                       className="px-3 py-1.5 rounded bg-red-600 text-white text-sm disabled:opacity-60"
                       onClick={() => remove(t._id)}
