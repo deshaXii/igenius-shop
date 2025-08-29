@@ -1,37 +1,3 @@
 {
-  "version": 2,
-  "builds": [
-    {
-      "src": "package.json",
-      "use": "@vercel/static-build"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
-    }
-  ],
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/" },
-    {
-      "source": "/api/(.*)",
-      "destination": "https://igenius-shop-api.vercel.app/api/$1"
-    },
-    {
-      "source": "/socket.io/(.*)",
-      "destination": "https://igenius-shop-api.vercel.app/socket.io/$1"
-    }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://igenius-shop.vercel.app"
-        }
-      ]
-    }
-  ]
+  "rewrites": [{ "source": "/(.*)", "destination": "/" }]
 }
