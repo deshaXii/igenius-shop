@@ -241,7 +241,7 @@ export default function InvoicesPage() {
       </header>
 
       {/* فلاتر الزمن + حالة الدفع (Sticky على الموبايل) */}
-      <section className="p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm space-y-2 sticky top-0 z-10">
+      <section className="p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm space-y-2 sticky top-[70px] sm:top-0 z-10">
         <div className="flex flex-wrap gap-2">
           <Btn
             label="اليوم"

@@ -205,7 +205,7 @@ export default function AccountsPage() {
       </header>
 
       {/* فلاتر (Sticky على الموبايل) */}
-      <section className="p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm space-y-2 sticky top-0 z-10">
+      <section className="p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm space-y-2 sticky top-[70px] sm:top-0 z-10">
         <div className="flex flex-wrap gap-2">
           <Btn
             label="اليوم"
@@ -265,7 +265,7 @@ export default function AccountsPage() {
       </section>
 
       {/* ملخص عام — بطاقات جميلة */}
-      <section className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KpiCard
           title="إجمالي الدخل (المُسلّم)"
           value={summary.totals?.grossRevenue || 0}
