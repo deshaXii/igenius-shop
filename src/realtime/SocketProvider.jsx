@@ -18,7 +18,18 @@ export default function SocketProvider({ children }) {
       window.location.origin;
     return io(base, {
       path: "/socket.io",
+      cors: {
+        origin:
+          process.env.NODE_ENV === "development"
+            ? "http://localhost:3000"
+            : "https://igenius-shop-api.vercel.app",
+        credentials: true,
+      },
       transports: ["websocket", "polling"],
+      autoConnect: true,
+      reconnection: true,
+      reconnectionAttempts: 5,
+      reconnectionDelay: 1000,
       withCredentials: true,
       auth: { token },
     });
