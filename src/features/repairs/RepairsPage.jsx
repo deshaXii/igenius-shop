@@ -411,7 +411,7 @@ export default function RepairsPage() {
             ref={mobileRepairsFilter}
             className="fixed bottom-[12px] left-[12px] mobile-repairs-filters md:static p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm space-y-3"
           >
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-1 sm:flex sm:flex-wrap gap-2">
               <div className="flex gap-2  all-full-width">
                 <QuickBtn
                   label="اليوم"

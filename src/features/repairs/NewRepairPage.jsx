@@ -119,7 +119,7 @@ export default function NewRepairPage() {
     <div className="space-y-6">
       <h1 className="text-xl font-bold">إضافة صيانة</h1>
 
-      <section className="z-50 relative p-3 rounded-xl bg-white dark:bg-gray-800 grid md:grid-cols-2 gap-4">
+      <section className="relative p-3 rounded-xl bg-white dark:bg-gray-800 grid md:grid-cols-2 gap-4">
         <Field label="اسم العميل">
           <div className="relative flex items-center justify-center box-with-icon">
             <InputField
@@ -240,73 +240,80 @@ export default function NewRepairPage() {
         {form.parts.length === 0 ? (
           <div className="opacity-70">لا توجد قطع</div>
         ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-right">
-                <th className="p-2">الاسم</th>
-                <th className="p-2">التكلفة</th>
-                <th className="p-2">المورد</th>
-                <th className="p-2">بواسطة</th>
-                <th className="p-2">تاريخ الشراء</th>
-                <th className="p-2">حذف</th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.parts.map((p, i) => (
-                <tr key={i} className="odd:bg-gray-50 dark:odd:bg-gray-700/40">
-                  <td className="p-2">
-                    <input
-                      value={p.name}
-                      onChange={(e) => updatePart(i, "name", e.target.value)}
-                      className="inp w-full"
-                    />
-                  </td>
-                  <td className="p-2">
-                    <input
-                      type="number"
-                      value={p.cost}
-                      onChange={(e) => updatePart(i, "cost", e.target.value)}
-                      className="inp w-28"
-                    />
-                  </td>
-                  <td className="p-2">
-                    <input
-                      value={p.supplier}
-                      onChange={(e) =>
-                        updatePart(i, "supplier", e.target.value)
-                      }
-                      className="inp w-full"
-                    />
-                  </td>
-                  <td className="p-2">
-                    <input
-                      value={p.source}
-                      onChange={(e) => updatePart(i, "source", e.target.value)}
-                      className="inp w-full"
-                    />
-                  </td>
-                  <td className="p-2">
-                    <input
-                      type="date"
-                      value={p.purchaseDate || ""}
-                      onChange={(e) =>
-                        updatePart(i, "purchaseDate", e.target.value)
-                      }
-                      className="inp w-full"
-                    />
-                  </td>
-                  <td className="p-2">
-                    <button
-                      onClick={() => removePart(i)}
-                      className="px-2 py-1 rounded-lg bg-red-500 text-white"
-                    >
-                      حذف
-                    </button>
-                  </td>
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-right">
+                  <th className="p-2">الاسم</th>
+                  <th className="p-2">التكلفة</th>
+                  <th className="p-2">المورد</th>
+                  <th className="p-2">بواسطة</th>
+                  <th className="p-2">تاريخ الشراء</th>
+                  <th className="p-2">حذف</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {form.parts.map((p, i) => (
+                  <tr
+                    key={i}
+                    className="odd:bg-gray-50 dark:odd:bg-gray-700/40"
+                  >
+                    <td className="p-2">
+                      <input
+                        value={p.name}
+                        onChange={(e) => updatePart(i, "name", e.target.value)}
+                        className="inp w-full"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="number"
+                        value={p.cost}
+                        onChange={(e) => updatePart(i, "cost", e.target.value)}
+                        className="inp w-28"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        value={p.supplier}
+                        onChange={(e) =>
+                          updatePart(i, "supplier", e.target.value)
+                        }
+                        className="inp w-full"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        value={p.source}
+                        onChange={(e) =>
+                          updatePart(i, "source", e.target.value)
+                        }
+                        className="inp w-full"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <input
+                        type="date"
+                        value={p.purchaseDate || ""}
+                        onChange={(e) =>
+                          updatePart(i, "purchaseDate", e.target.value)
+                        }
+                        className="inp w-full"
+                      />
+                    </td>
+                    <td className="p-2">
+                      <button
+                        onClick={() => removePart(i)}
+                        className="px-2 py-1 rounded-lg bg-red-500 text-white"
+                      >
+                        حذف
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
       <QrAfterCreateModal
