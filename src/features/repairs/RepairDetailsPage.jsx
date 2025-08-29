@@ -209,7 +209,7 @@ export default function SingleRepairPage() {
                 : "—"
             }
           />
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 space-y-1 md:space-y-0">
             <button
               onClick={() => {
                 const token = repair?.publicTracking?.token;
