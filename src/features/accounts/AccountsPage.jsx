@@ -342,7 +342,7 @@ export default function AccountsPage() {
                     # {t.deliveredCount ?? "—"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
+                <div className="grid grid-cols-3 gap-2 mt-2 text-sm">
                   <KV k="صافي الربح" v={egp(Math.round(t.netProfit))} />
                   <KV k="نصيب الفني" v={egp(Math.round(t.techShare))} />
                   <KV k="نصيب المحل" v={egp(Math.round(t.shopShare))} />
@@ -586,7 +586,7 @@ function TransactionsBlock({ startDate, endDate }) {
                   {!!t.description && (
                     <div className="mt-1 text-sm">{t.description}</div>
                   )}
-                  <div className="absolute top-[10px] left-[10px]">
+                  <div className="absolute bottom-[10px] left-[10px]">
                     <button
                       className="px-3 py-1.5 rounded bg-red-600 text-white text-sm disabled:opacity-60"
                       onClick={() => remove(t._id)}
