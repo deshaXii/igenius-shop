@@ -411,7 +411,7 @@ export default function EditRepairPage() {
         {form.parts.length === 0 ? (
           <div className="opacity-70">لا توجد قطع</div>
         ) : (
-          <div className="overflow-x-auto w-full">
+          <div className="overflow-x-auto repairs-parts-box w-full">
             <table className="w-full text-sm repair-parts-table">
               <thead>
                 <tr className="text-right">

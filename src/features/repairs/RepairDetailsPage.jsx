@@ -349,21 +349,21 @@ export default function SingleRepairPage() {
                 >
                   <div className="font-semibold mb-1">{p.name || "—"}</div>
                   <div className="text-sm space-y-1">
-                    <div className="flex justify-center">
+                    <div className="flex justify-between">
                       <span className="opacity-70">بواسطة: </span>
                       <span>{p.source || "—"}</span>
                     </div>
-                    <div className="flex justify-center">
+                    <div className="flex justify-between">
                       <span className="opacity-70">المورد: </span>
                       <span>{p.supplier || "—"}</span>
                     </div>
-                    <div className="flex justify-center">
+                    <div className="flex justify-between">
                       <span className="opacity-70">تاريخ الشراء: </span>
                       <span>
                         {p.purchaseDate ? formatDate(p.purchaseDate) : "—"}
                       </span>
                     </div>
-                    <div className="flex justify-center">
+                    <div className="flex justify-between">
                       <span className="opacity-70">التكلفة: </span>
                       <span>{typeof p.cost === "number" ? p.cost : "—"}</span>
                     </div>
