@@ -170,6 +170,24 @@ input::-webkit-calendar-picker-indicator {
     padding-right: 0;
     font-size: 13px;
   }
+  .dark .delevryModel input {
+    border: 1px solid #2d2b3d;
+    margin-top: 10px !important;
+    width: 100%;
+  }
+
+  .delevryModel h2 {
+    font-size: 16px;
+    max-width: 60%;
+  }
+
+  .delevryModel td input {
+    width: 120px !important;
+  }
+
+  .delevryModel {
+    margin: 0 !important;
+  }
 }
 
 .btn.sun-mode-button svg,

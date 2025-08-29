@@ -84,7 +84,7 @@ export default function DeliveryModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50">
+    <div className="delevryModel fixed inset-0 z-[1000] flex items-center justify-center bg-black/50">
       <div className="w-[95vw] max-w-3xl rounded-2xl bg-white dark:bg-gray-900 p-4 space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold">
