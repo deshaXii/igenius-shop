@@ -2,7 +2,7 @@ import React, { useMemo } from "react";
 
 /**
  * props:
- * - shopName        : string (مثلاً "الأقصى ستور")
+ * - shopName        : string (مثلاً "IGenius")
  * - ticketNo        : string|number (مثلاً repair.serial || repair.code || repair._id.slice(-6))
  * - customerName    : string
  * - customerPhone   : string
@@ -12,11 +12,11 @@ import React, { useMemo } from "react";
  * - receivedAt      : string|Date (وقت الاستلام من العميل)
  * - price           : number
  * - paid            : number
- * - logoUrl         : string (اختياري: لوجو المعلم بالأقصى)
+ * - logoUrl         : string (اختياري: لوجو IGenius)
  * - qrDataUrl       : string (اختياري: QR كـ dataURL لو عايز تطبعه أعلى الإيصال)
  */
 export default function RepairReceipt({
-  shopName = "الأقصى ستور",
+  shopName = "IGenius",
   ticketNo = "",
   customerName = "",
   customerPhone = "",
