@@ -94,10 +94,6 @@ input::-webkit-calendar-picker-indicator {
   background: #f3f4f6;
 }
 
-.all-full-width > * {
-  flex: 1;
-}
-
 .show-mobile-repairs-filter-btn {
   transition: bottom 0.3s linear;
 }
