@@ -123,7 +123,8 @@ export default function NotificationsLive() {
             params: { unread: true, limit: 10 },
           }).then((r) => r.data);
           (Array.isArray(items) ? items : []).forEach(show);
-        } catch {
+        } catch (err) {
+          console.log(err);
           /* تجاهل */
         }
         if (!closed) pollTimer = setTimeout(poll, 60000);
@@ -138,14 +139,14 @@ export default function NotificationsLive() {
         auth: token
           ? { token: token.startsWith("Bearer ") ? token : `Bearer ${token}` }
           : {},
-        timeout: 4000,
+        timeout: 10000,
       });
 
       socket.on("connect_error", () => {
         // فشل الاتصال → استخدم polling
         if (!closed) {
           socket.close();
-          startPolling();
+          // startPolling();
         }
       });
 
@@ -164,9 +165,12 @@ export default function NotificationsLive() {
         clearTimeout(pollTimer);
         try {
           socket && socket.close();
-        } catch {}
+        } catch (err) {
+          console.log(err);
+        }
       };
-    } catch {
+    } catch (err) {
+      console.log(err);
       // أي خطأ تاني → polling
       startPolling();
       return () => {
