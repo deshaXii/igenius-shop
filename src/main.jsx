@@ -13,12 +13,10 @@ import { bindServiceWorkerMessages } from "./realtime/swMessages";
 bindServiceWorkerMessages();
 
 ReactDOM.createRoot(document.getElementById("root")).render(
-  <React.StrictMode>
-    <SocketProvider>
-      <NotificationsBridge />
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
-    </SocketProvider>
-  </React.StrictMode>
+  <SocketProvider>
+    <NotificationsBridge />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
+  </SocketProvider>
 );
