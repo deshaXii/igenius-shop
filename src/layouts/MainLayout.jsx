@@ -150,7 +150,7 @@ export default function MainLayout() {
             <span className="text-blue-600">
               <IconLogo />
             </span>
-            <span>هيما فون</span>
+            <span>IGenius</span>
           </Link>
           <button
             onClick={() => setSidebarOpen(false)}

@@ -217,7 +217,7 @@ export default function QrAfterCreateModal({
           <div style={{ position: "fixed", left: -9999, top: -9999 }}>
             <div ref={receiptRef}>
               <RepairReceipt
-                shopName="هيما فون"
+                shopName="IGenius"
                 ticketNo={
                   repair?.serial ||
                   repair?.code ||
