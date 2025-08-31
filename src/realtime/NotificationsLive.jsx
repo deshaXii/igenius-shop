@@ -126,7 +126,7 @@ export default function NotificationsLive() {
         } catch {
           /* تجاهل */
         }
-        if (!closed) pollTimer = setTimeout(poll, 20000 * 4);
+        if (!closed) pollTimer = setTimeout(poll, 60000);
       };
       poll();
     }

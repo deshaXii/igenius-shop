@@ -11,6 +11,7 @@ export default function NotificationBell() {
       const list = await API.get("/notifications").then((r) => r.data);
       setCount(list.filter((n) => !n.read).length);
     } catch (e) {
+      console.log(e);
       // ignore
     }
   }
@@ -39,7 +40,7 @@ export default function NotificationBell() {
 
   useEffect(() => {
     fetchCount();
-    const i = setInterval(fetchCount, 10000); // كل 10 ثواني
+    const i = setInterval(fetchCount, 20000); // كل 10 ثواني
     return () => clearInterval(i);
   }, []);
 
