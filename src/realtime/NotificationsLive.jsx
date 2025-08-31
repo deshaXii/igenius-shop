@@ -109,14 +109,13 @@ export default function NotificationsLive() {
   useEffect(() => {
     let closed = false;
     let pollTimer = null;
-    let socket;
 
     const baseURL =
       (API.defaults?.baseURL || "").replace(/\/api\/?$/i, "") ||
       window.location.origin.replace(/:\d+$/, ":5000"); // fallback
 
     function startPolling() {
-      // كل 15 ثانية هات غير المقروء واعرض أول عناصر جديدة فقط
+      // كل دقيقة هات غير المقروء واعرض أول عناصر جديدة فقط
       const poll = async () => {
         try {
           const items = await API.get("/notifications", {
@@ -132,52 +131,12 @@ export default function NotificationsLive() {
       poll();
     }
 
-    try {
-      socket = io(baseURL, {
-        path: "/socket.io",
-        transports: ["websocket"],
-        auth: token
-          ? { token: token.startsWith("Bearer ") ? token : `Bearer ${token}` }
-          : {},
-        timeout: 10000,
-      });
-
-      socket.on("connect_error", () => {
-        // فشل الاتصال → استخدم polling
-        if (!closed) {
-          socket.close();
-          // startPolling();
-        }
-      });
-
-      socket.on("notification:new", (n) => {
-        show(n);
-      });
-
-      // لو مفيش توكن، غالبًا السيرفر مش هيعطي room → شغّل polling كنسخة احتياط
-      const noAuthFallback = setTimeout(() => {
-        if (!token && !closed) startPolling();
-      }, 1000);
-
-      return () => {
-        closed = true;
-        clearTimeout(noAuthFallback);
-        clearTimeout(pollTimer);
-        try {
-          socket && socket.close();
-        } catch (err) {
-          console.log(err);
-        }
-      };
-    } catch (err) {
-      console.log(err);
-      // أي خطأ تاني → polling
-      startPolling();
-      return () => {
-        closed = true;
-        clearTimeout(pollTimer);
-      };
-    }
+    // بما إن Vercel مش بتدعم socket.io → نستخدم polling مباشرة
+    startPolling();
+    return () => {
+      closed = true;
+      clearTimeout(pollTimer);
+    };
   }, [token]);
 
   return (

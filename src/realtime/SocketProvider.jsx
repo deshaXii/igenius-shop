@@ -29,7 +29,7 @@ export default function SocketProvider({ children }) {
       autoConnect: true,
       reconnection: true,
       reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+      reconnectionDelay: 10000,
       withCredentials: true,
       auth: { token },
     });
