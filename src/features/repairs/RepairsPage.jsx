@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../lib/api";
-import { listRepairs, updateRepairStatus, updateRepair, setWarranty } from "./repairsApi";
+import {
+  listRepairs,
+  updateRepairStatus,
+  updateRepair,
+  setWarranty,
+} from "./repairsApi";
 import formatDate from "../../utils/formatDate";
 import statusOptions from "../../utils/statusOptions";
 import useAuthStore from "../auth/authStore";
@@ -118,8 +123,16 @@ function handlePrintReceipt(rep) {
     <tr><th>النوع</th><td>${rep.deviceType || "—"}</td></tr>
     <tr><th>اللون</th><td>${rep.color || "—"}</td></tr>
     <tr><th>العطل</th><td>${rep.issue || "—"}</td></tr>
-    <tr><th>السعر المتفق عليه</th><td>${hasNum(rep.price) ? Number(rep.price) : "—"}</td></tr>
-    <tr><th>السعر النهائي</th><td>${hasNum(rep.finalPrice) ? Number(rep.finalPrice) : (hasNum(rep.price) ? Number(rep.price) : "—")}</td></tr>
+    <tr><th>السعر المتفق عليه</th><td>${
+      hasNum(rep.price) ? Number(rep.price) : "—"
+    }</td></tr>
+    <tr><th>السعر النهائي</th><td>${
+      hasNum(rep.finalPrice)
+        ? Number(rep.finalPrice)
+        : hasNum(rep.price)
+        ? Number(rep.price)
+        : "—"
+    }</td></tr>
     <tr><th>الضمان</th><td>${warrantyTxt}</td></tr>
   </table>
 
@@ -147,7 +160,9 @@ function handleWhatsAppMessage(rep) {
   const partsSummary = (rep.parts || [])
     .map(
       (p) =>
-        `- ${p.name || "قطعة"}${Number.isFinite(p.cost) ? ` (${Math.round(p.cost)}ج)` : ""}`
+        `- ${p.name || "قطعة"}${
+          Number.isFinite(p.cost) ? ` (${Math.round(p.cost)}ج)` : ""
+        }`
     )
     .join("%0A");
 
@@ -160,9 +175,17 @@ function handleWhatsAppMessage(rep) {
 
   const msg = [
     `أهلاً ${rep.customerName || "عميلنا الكريم"} 👋`,
-    `يسعدنا إبلاغك أن جهازك (${rep.deviceType || "الجهاز"}) أصبح ${rep.status === "تم التسليم" ? "جاهزًا وتم تسليمه" : "جاهزًا"} ✅`,
+    `يسعدنا إبلاغك أن جهازك (${rep.deviceType || "الجهاز"}) أصبح ${
+      rep.status === "تم التسليم" ? "جاهزًا وتم تسليمه" : "جاهزًا"
+    } ✅`,
     `العطل: ${rep.issue || "—"}`,
-    `السعر النهائي: ${hasNum(rep.finalPrice) ? Number(rep.finalPrice) : (hasNum(rep.price) ? Number(rep.price) : "—")} جنيه`,
+    `السعر النهائي: ${
+      hasNum(rep.finalPrice)
+        ? Number(rep.finalPrice)
+        : hasNum(rep.price)
+        ? Number(rep.price)
+        : "—"
+    } جنيه`,
     `القطع المستخدمة:%0A${partsSummary || "- لا توجد قطع"}`,
     `الضمان: ${warrantyLine}`,
     track ? `رابط تتبّع/تفاصيل الصيانة: ${track}` : null,
@@ -211,14 +234,18 @@ export default function RepairsPage() {
       try {
         const { data } = await API.get(`/repairs/${id}`);
         setList((prev) => {
-          const idx = prev.findIndex((x) => String(x._id || x.id) === String(id));
+          const idx = prev.findIndex(
+            (x) => String(x._id || x.id) === String(id)
+          );
           if (idx === -1) return prev;
           const next = prev.slice();
           next[idx] = data;
           return next;
         });
       } catch (err) {
-        try { await load(); } catch {}
+        try {
+          await load();
+        } catch {}
       }
     }
     window.addEventListener("repairs:update-one", onUpdateOne);
@@ -333,7 +360,8 @@ export default function RepairsPage() {
 
   function openDeliverModal(r) {
     const isAssigned =
-      r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
+      r.technician &&
+      (r.technician._id || r.technician) === (user?.id || user?._id);
     setDeliverRequirePassword(!canEditAll && isAssigned);
     setDeliverTarget(r);
     setDeliverOpen(true);
@@ -346,7 +374,9 @@ export default function RepairsPage() {
         cost: p.cost ? Number(p.cost) : 0,
         supplier: p.supplier || undefined,
         source: p.source || undefined,
-        purchaseDate: p.purchaseDate ? new Date(p.purchaseDate).toISOString() : undefined,
+        purchaseDate: p.purchaseDate
+          ? new Date(p.purchaseDate).toISOString()
+          : undefined,
       }));
 
       // دعم تعديل السعر النهائي + السعر المبدئي من مودال التسليم إن وُجد
@@ -391,7 +421,8 @@ export default function RepairsPage() {
       if (nextStatus === "مرفوض") {
         const body = { status: nextStatus };
         const isAssigned =
-          r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
+          r.technician &&
+          (r.technician._id || r.technician) === (user?.id || user?._id);
         if (!canEditAll && isAssigned) {
           const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
           if (!password) return;
@@ -405,7 +436,8 @@ export default function RepairsPage() {
       // الحالات الأخرى (بما فيها "مكتمل")
       const body = { status: nextStatus };
       const isAssigned =
-        r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
+        r.technician &&
+        (r.technician._id || r.technician) === (user?.id || user?._id);
       if (!canEditAll && isAssigned) {
         const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
         if (!password) return;
@@ -433,7 +465,8 @@ export default function RepairsPage() {
   async function changeRejectedLocation(r, loc) {
     try {
       const isAssigned =
-        r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
+        r.technician &&
+        (r.technician._id || r.technician) === (user?.id || user?._id);
 
       const body = { status: "مرفوض", rejectedDeviceLocation: loc };
       if (!canEditAll && isAssigned) {
@@ -475,10 +508,11 @@ export default function RepairsPage() {
     <button
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition
-      ${active
+      ${
+        active
           ? "bg-blue-600 text-white border-blue-600"
           : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-        }`}
+      }`}
       aria-pressed={active}
     >
       <span aria-hidden="true">{icon}</span>
@@ -501,8 +535,9 @@ export default function RepairsPage() {
     };
     return (
       <span
-        className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || "bg-gray-100 dark:bg-gray-700"
-          }`}
+        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+          map[s] || "bg-gray-100 dark:bg-gray-700"
+        }`}
       >
         {s}
       </span>
@@ -720,16 +755,18 @@ export default function RepairsPage() {
             ) : (
               list.map((r) => {
                 const old = isOldRepair(r, quick, startDate, endDate);
-                const basePrice  = hasNum(r.price) ? Number(r.price) : null;
-                const finalPrice = hasNum(r.finalPrice) ? Number(r.finalPrice) : null;
+                const basePrice = hasNum(r.price) ? Number(r.price) : null;
+                const finalPrice = hasNum(r.finalPrice)
+                  ? Number(r.finalPrice)
+                  : null;
                 return (
                   <tr
                     key={r._id}
-                    className={`${r.hasWarranty
-                      ? "bg-amber-50/40 dark:bg-amber-900/10"
-                      : ""
-                      } odd:bg-gray-50 rounded-[4px] dark:odd:bg-gray-700/40 hover:bg-gray-100/60 dark:hover:bg-gray-700/60 transition ${old ? "ring-1 ring-yellow-200 dark:ring-yellow-700" : ""
-                      }`}
+                    className={`${
+                      r.hasWarranty ? "bg-amber-50/40 dark:bg-amber-900/10" : ""
+                    } odd:bg-gray-50 rounded-[4px] dark:odd:bg-gray-700/40 hover:bg-gray-100/60 dark:hover:bg-gray-700/60 transition ${
+                      old ? "ring-1 ring-yellow-200 dark:ring-yellow-700" : ""
+                    }`}
                   >
                     <Td className="">
                       <div className="flex items-center gap-2 whitespace-nowrap">
@@ -830,24 +867,34 @@ export default function RepairsPage() {
           <EmptyState />
         ) : (
           list.map((r) => {
-            const basePrice  = hasNum(r.price) ? Number(r.price) : null;
-            const finalPrice = hasNum(r.finalPrice) ? Number(r.finalPrice) : null;
-            const priceLine  = finalPrice ?? basePrice ?? "—";
-            const hint       = (finalPrice !== null && basePrice !== null && finalPrice !== basePrice)
-              ? ` (مبدئي: ${basePrice})`
-              : "";
+            const basePrice = hasNum(r.price) ? Number(r.price) : null;
+            const finalPrice = hasNum(r.finalPrice)
+              ? Number(r.finalPrice)
+              : null;
+            const priceLine = finalPrice ?? basePrice ?? "—";
+            const hint =
+              finalPrice !== null &&
+              basePrice !== null &&
+              finalPrice !== basePrice
+                ? ` (مبدئي: ${basePrice})`
+                : "";
             return (
               <div
                 key={r._id}
-                className={`p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm ${r.hasWarranty ? "border border-amber-300/60 bg-amber-50/40 dark:bg-amber-900/10" : ""
-                  }`}
+                className={`p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm ${
+                  r.hasWarranty
+                    ? "border border-amber-300/60 bg-amber-50/40 dark:bg-amber-900/10"
+                    : ""
+                }`}
               >
                 <div className="flex items-center justify-between">
                   <div className="font-bold flex items-center gap-2 whitespace-nowrap">
-                    <span>#{r.repairId} — {r.deviceType}</span>
+                    <span>
+                      #{r.repairId} — {r.deviceType}
+                    </span>
                     {r.hasWarranty && <WarrantyBadge until={r.warrantyEnd} />}
                   </div>
-                <StatusPill s={r.status} />
+                  <StatusPill s={r.status} />
                 </div>
                 <div className="text-sm opacity-80">
                   {r.customerName} • {r.phone || "—"}
@@ -862,10 +909,7 @@ export default function RepairsPage() {
                 <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
                   <Info label="العطل" value={r.issue || "—"} />
                   <Info label="اللون" value={r.color || "—"} />
-                  <Info
-                    label="السعر"
-                    value={`${priceLine}${hint}`}
-                  />
+                  <Info label="السعر" value={`${priceLine}${hint}`} />
                   <Info label="إنشاء" value={formatDate(r.createdAt)} />
                   <Info
                     label="التسليم"
@@ -933,7 +977,11 @@ export default function RepairsPage() {
           setDeliverTarget(null);
         }}
         onSubmit={submitDeliver}
-        initialFinalPrice={deliverTarget ? (deliverTarget.finalPrice ?? deliverTarget.price ?? 0) : 0}
+        initialFinalPrice={
+          deliverTarget
+            ? deliverTarget.finalPrice ?? deliverTarget.price ?? 0
+            : 0
+        }
         initialParts={deliverTarget ? deliverTarget.parts || [] : []}
         requirePassword={deliverRequirePassword}
       />
@@ -1005,7 +1053,9 @@ export default function RepairsPage() {
 
                   // بعد تحديد الضمان، لو الحالة بالفعل مكتمل/تم التسليم افتح مودال الإجراءات
                   try {
-                    const fresh = await API.get(`/repairs/${warrantyTarget._id}`).then(r => r.data);
+                    const fresh = await API.get(
+                      `/repairs/${warrantyTarget._id}`
+                    ).then((r) => r.data);
                     setWarrantyTarget(null);
                     if (["مكتمل", "تم التسليم"].includes(fresh?.status)) {
                       setAfterCompleteTarget(fresh);
@@ -1043,7 +1093,12 @@ function WarrantyBadge({ until }) {
       title={until ? `ضمان حتى ${formatDate(until)}` : "ضمان"}
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
     >
-      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor" aria-hidden="true">
+      <svg
+        viewBox="0 0 24 24"
+        className="w-3 h-3"
+        fill="currentColor"
+        aria-hidden="true"
+      >
         <path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4zM8 11l2 2 4-4 1.5 1.5L10 15l-3.5-3.5L8 11z" />
       </svg>
       ضمان
