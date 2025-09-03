@@ -1,9 +1,7 @@
-// src/features/repairs/NewRepairPage.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../../lib/api";
 import { createRepair } from "./repairsApi";
-import formatDate from "../../utils/formatDate";
 import InputField from "../../components/InputField";
 import VoiceInput from "../../components/VoiceInput";
 import QrAfterCreateModal from "../../components/QrAfterCreateModal";
@@ -12,6 +10,7 @@ export default function NewRepairPage() {
   const nav = useNavigate();
   const [techs, setTechs] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [hasWarranty, setHasWarranty] = useState(false);
 
   const [qrOpen, setQrOpen] = useState(false);
   const [trackingUrl, setTrackingUrl] = useState("");
@@ -79,10 +78,10 @@ export default function NewRepairPage() {
     }
     setSaving(true);
     try {
-      // نظّف الأرقام
       const priceNum = form.price ? Number(form.price) : 0;
       const payload = {
         ...form,
+        hasWarranty,
         price: priceNum,
         parts: form.parts.map((p) => ({
           name: p.name,
@@ -96,17 +95,13 @@ export default function NewRepairPage() {
       };
 
       const created = await createRepair(payload);
-      // السيرفر بيرجع publicTrackingUrl
-      console.log("created ", created);
 
       const token = created?.publicTracking?.token;
       const url = token ? `${window.location.origin}/t/${token}` : "";
 
       setCreatedRepair(created);
       setTrackingUrl(url);
-      console.log(url);
       setQrOpen(true);
-      // nav(`/repairs/${created._id}`);
     } catch (e) {
       console.log(e);
       alert(e?.response?.data?.message || "حدث خطأ");
@@ -188,6 +183,16 @@ export default function NewRepairPage() {
               <VoiceInput onText={(text) => setField("issue", text)} />
             </div>
           </div>
+          <div className="warranty-box mt-2">
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={hasWarranty}
+                onChange={(e) => setHasWarranty(e.target.checked)}
+              />
+              <span>الصيانة تحت ضمان</span>
+            </label>
+          </div>
         </Field>
         <Field label="السعر المبدئي">
           <div className="relative flex items-center justify-center box-with-icon">
@@ -223,7 +228,7 @@ export default function NewRepairPage() {
               className="inp w-full"
               value={form.notes}
               onChange={(e) => setField("notes", e.target.value)}
-              placeholder="ادخل السعر المبدئي"
+              placeholder="ادخل ملاحظاتك"
             />
             <div className="">
               <VoiceInput onText={(text) => setField("notes", text)} />
@@ -321,12 +326,12 @@ export default function NewRepairPage() {
           </div>
         )}
       </section>
+
       <QrAfterCreateModal
         open={qrOpen}
         onClose={() => {
           setQrOpen(false);
           if (createdRepair?._id) {
-            // خليك على صفحة التفاصيل مباشرة
             nav(`/repairs/${createdRepair._id}`);
           } else {
             nav("/repairs");
@@ -356,20 +361,6 @@ function Field({ label, children }) {
       <style>
         {`.inp{padding:.5rem .75rem;border-radius:.75rem;background:var(--inp-bg,#f3f4f6);}`}
       </style>
-    </label>
-  );
-}
-function Inp({ label, v, onChange, type = "text", required }) {
-  return (
-    <label className="space-y-1">
-      <div className="text-sm opacity-80">{label}</div>
-      <input
-        value={v}
-        onChange={(e) => onChange(e.target.value)}
-        type={type}
-        required={required}
-        className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
-      />
     </label>
   );
 }

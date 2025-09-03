@@ -254,7 +254,7 @@ export default function AccountsPage() {
 
           <button
             onClick={load}
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white"
+            className="submit-btn px-4 py-2 rounded-xl bg-blue-600 text-white"
           >
             تطبيق
           </button>

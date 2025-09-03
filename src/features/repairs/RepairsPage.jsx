@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../lib/api";
-import { listRepairs, updateRepairStatus, updateRepair } from "./repairsApi";
+import { listRepairs, updateRepairStatus, updateRepair, setWarranty } from "./repairsApi";
 import formatDate from "../../utils/formatDate";
 import statusOptions from "../../utils/statusOptions";
 import useAuthStore from "../auth/authStore";
@@ -9,6 +9,38 @@ import DeliveryModal from "../../components/DeliveryModal";
 import StatusSelect from "../../components/StatusSelect";
 
 /* ========= Helpers ========= */
+function toNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+function includeNumberField(obj, key, val) {
+  // أضف الحقل الرقمي فقط لو ليه قيمة معتبرة (مش فاضي)
+  if (val === "" || val === null || val === undefined) return obj;
+  const n = Number(val);
+  return Number.isFinite(n) ? { ...obj, [key]: n } : obj;
+}
+function hasNum(v) {
+  if (v === "" || v === null || v === undefined) return false;
+  const n = Number(v);
+  return Number.isFinite(n);
+}
+
+// ======== NEW: بيانات المحل (بدّلها لو عندك Settings) ========
+const SHOP = {
+  name: "IGenius",
+  phone: "01000000000",
+  address: "القاهرة — شارع المثال، عمارة 10",
+  footer: "شكراً لاختياركم خدماتنا.",
+  warrantyNote:
+    "الضمان يشمل العطل المُصلّح فقط ولا يشمل سوء الاستخدام أو الكسر أو السوائل.",
+};
+
+// ======== NEW: هيلبرز مشتركة ========
+function getTrackingUrl(rep) {
+  const token = rep?.publicTracking?.token;
+  return token ? `${window.location.origin}/t/${token}` : "";
+}
+
 function inRange(dateISO, startStr, endStr) {
   if (!dateISO || !startStr || !endStr) return false;
   const d = new Date(dateISO);
@@ -32,8 +64,129 @@ function ymdLocal(d) {
   return `${y}-${m}-${day}`;
 }
 
+// ======== NEW: طباعة إيصال الضمان لصيانة معيّنة ========
+function handlePrintReceipt(rep) {
+  if (!rep) return;
+  const win = window.open("", "_blank", "width=800,height=900");
+  const warrantyTxt =
+    rep?.hasWarranty && rep?.warrantyEnd
+      ? `ضمان حتى: ${formatDate(rep.warrantyEnd)}`
+      : "— لا يوجد تاريخ ضمان محدد —";
+
+  const html = `
+<!doctype html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="utf-8"/>
+<title>إيصال ضمان — #${rep.repairId ?? "-"}</title>
+<style>
+  body{font-family:Tahoma,Arial,sans-serif; margin:24px; color:#111;}
+  .hdr{display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:16px;}
+  .shop h1{margin:0; font-size:20px}
+  .shop div{font-size:12px; opacity:.8}
+  .meta{font-size:12px; text-align:left}
+  h2{font-size:16px; margin:16px 0 8px}
+  table{width:100%; border-collapse:collapse}
+  th,td{border:1px solid #ddd; padding:8px; font-size:13px}
+  .note{margin-top:12px; font-size:12px; opacity:.8}
+  .footer{margin-top:18px; font-size:12px; text-align:center}
+  .badge{display:inline-block; padding:2px 8px; border-radius:8px; background:#f5f5f5; font-size:12px}
+</style>
+</head>
+<body>
+  <div class="hdr">
+    <div class="shop">
+      <h1>${SHOP.name}</h1>
+      <div>الهاتف: ${SHOP.phone}</div>
+      <div>العنوان: ${SHOP.address}</div>
+    </div>
+    <div class="meta">
+      <div>رقم الصيانة: #${rep.repairId ?? "-"}</div>
+      <div>التاريخ: ${formatDate(new Date().toISOString())}</div>
+      <div class="badge">${rep.status || ""}</div>
+    </div>
+  </div>
+
+  <h2>بيانات العميل</h2>
+  <table>
+    <tr><th>الاسم</th><td>${rep.customerName || "—"}</td></tr>
+    <tr><th>الهاتف</th><td>${rep.phone || "—"}</td></tr>
+  </table>
+
+  <h2>بيانات الجهاز</h2>
+  <table>
+    <tr><th>النوع</th><td>${rep.deviceType || "—"}</td></tr>
+    <tr><th>اللون</th><td>${rep.color || "—"}</td></tr>
+    <tr><th>العطل</th><td>${rep.issue || "—"}</td></tr>
+    <tr><th>السعر المتفق عليه</th><td>${hasNum(rep.price) ? Number(rep.price) : "—"}</td></tr>
+    <tr><th>السعر النهائي</th><td>${hasNum(rep.finalPrice) ? Number(rep.finalPrice) : (hasNum(rep.price) ? Number(rep.price) : "—")}</td></tr>
+    <tr><th>الضمان</th><td>${warrantyTxt}</td></tr>
+  </table>
+
+  <div class="note"><strong>ملاحظات الضمان:</strong> ${SHOP.warrantyNote}</div>
+  <div class="footer">${SHOP.footer}</div>
+
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`;
+  win.document.open();
+  win.document.write(html);
+  win.document.close();
+}
+
+// ======== NEW: رسالة واتساب لصيانة معيّنة (+20 مصر) ========
+function handleWhatsAppMessage(rep) {
+  if (!rep?.phone) {
+    alert("لا يوجد رقم هاتف للعميل.");
+    return;
+  }
+  const digits = String(rep.phone).replace(/\D+/g, "");
+  const normalized = digits.replace(/^0+/, ""); // شيل أصفار البداية
+  const phoneE164 = `20${normalized}`; // +20 مصر
+
+  const partsSummary = (rep.parts || [])
+    .map(
+      (p) =>
+        `- ${p.name || "قطعة"}${Number.isFinite(p.cost) ? ` (${Math.round(p.cost)}ج)` : ""}`
+    )
+    .join("%0A");
+
+  const warrantyLine =
+    rep?.hasWarranty && rep?.warrantyEnd
+      ? `الضمان حتى ${formatDate(rep.warrantyEnd)}`
+      : "بدون تاريخ ضمان محدد";
+
+  const track = getTrackingUrl(rep);
+
+  const msg = [
+    `أهلاً ${rep.customerName || "عميلنا الكريم"} 👋`,
+    `يسعدنا إبلاغك أن جهازك (${rep.deviceType || "الجهاز"}) أصبح ${rep.status === "تم التسليم" ? "جاهزًا وتم تسليمه" : "جاهزًا"} ✅`,
+    `العطل: ${rep.issue || "—"}`,
+    `السعر النهائي: ${hasNum(rep.finalPrice) ? Number(rep.finalPrice) : (hasNum(rep.price) ? Number(rep.price) : "—")} جنيه`,
+    `القطع المستخدمة:%0A${partsSummary || "- لا توجد قطع"}`,
+    `الضمان: ${warrantyLine}`,
+    track ? `رابط تتبّع/تفاصيل الصيانة: ${track}` : null,
+    "",
+    "نطمح لمعرفة مدى رضاك عن الخدمة. لو عندك أي ملاحظات أو احتجت مساعدة احنا موجودين دايمًا 🌟",
+    SHOP.name,
+  ]
+    .filter(Boolean)
+    .join("%0A");
+
+  const url = `https://wa.me/${phoneE164}?text=${msg}`;
+  window.open(url, "_blank");
+}
+
 export default function RepairsPage() {
   const mobileRepairsFilter = useRef(null);
+
+  // ======== NEW: مودالات الضمان/الإجراءات ========
+  const [afterCompleteOpen, setAfterCompleteOpen] = useState(false);
+  const [afterCompleteTarget, setAfterCompleteTarget] = useState(null);
+
+  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
+  const [warrantyEnd, setWarrantyEnd] = useState("");
+  const [warrantyTarget, setWarrantyTarget] = useState(null);
 
   function showMobileFilter(e) {
     e.target.style.transition = "bottom 0.3s linear;";
@@ -46,38 +199,32 @@ export default function RepairsPage() {
   }
 
   useEffect(() => {
-    const h = () => load(); // ⬅️ كان refetch، خلّيه يستدعي load()
+    const h = () => load();
     window.addEventListener("repairs:refresh", h);
     return () => window.removeEventListener("repairs:refresh", h);
   }, []);
+
   useEffect(() => {
     async function onUpdateOne(e) {
       const id = e?.detail?.id;
       if (!id) return;
       try {
-        const { data } = await API.get(`/repairs/${id}`); // يجيب الصيانة المحدثة فقط
+        const { data } = await API.get(`/repairs/${id}`);
         setList((prev) => {
-          const idx = prev.findIndex(
-            (x) => String(x._id || x.id) === String(id)
-          );
-          if (idx === -1) {
-            // مش موجودة في الصفحة (يمكن خارج الفلترة الحالية) → سيبها أو أضفها لو حابب
-            return prev;
-          }
+          const idx = prev.findIndex((x) => String(x._id || x.id) === String(id));
+          if (idx === -1) return prev;
           const next = prev.slice();
-          next[idx] = data; // استبدال العنصر بالنسخة الجديدة
+          next[idx] = data;
           return next;
         });
       } catch (err) {
-        // في حال فشل الطلب (نادراً) نرجع للخطة ب: تحميل القائمة كلها
-        try {
-          await load();
-        } catch {}
+        try { await load(); } catch {}
       }
     }
     window.addEventListener("repairs:update-one", onUpdateOne);
     return () => window.removeEventListener("repairs:update-one", onUpdateOne);
   }, []);
+
   const { user } = useAuthStore();
   const navigation = useNavigate();
   useEffect(() => {
@@ -97,13 +244,11 @@ export default function RepairsPage() {
     user?.permissions?.addRepair ||
     user?.permissions?.receiveDevice;
 
-  // صلاحية الحذف
   const canDeleteAll =
     isAdmin ||
     user?.permissions?.adminOverride ||
     user?.permissions?.deleteRepair;
 
-  // لعرض/إخفاء الفلاتر
   const canUseRepairFilters = isAdmin || user?.permissions?.editRepair;
 
   const todayStr = useMemo(() => ymdLocal(new Date()), []);
@@ -123,7 +268,6 @@ export default function RepairsPage() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
 
-  // حذف (حالة زر)
   const [deletingId, setDeletingId] = useState(null);
 
   // Modal (تسليم)
@@ -131,10 +275,8 @@ export default function RepairsPage() {
   const [deliverTarget, setDeliverTarget] = useState(null);
   const [deliverRequirePassword, setDeliverRequirePassword] = useState(false);
 
-  // أخطاء عامة
   const [error, setError] = useState("");
 
-  // تحميل الفنيين مرة واحدة
   useEffect(() => {
     (async () => {
       try {
@@ -144,7 +286,6 @@ export default function RepairsPage() {
     })();
   }, []);
 
-  // أزرار المدى السريع
   function applyQuick(qk) {
     setQuick(qk);
     if (qk === "today") {
@@ -159,7 +300,6 @@ export default function RepairsPage() {
     }
   }
 
-  // تحميل القائمة
   async function load() {
     setLoading(true);
     setError("");
@@ -168,13 +308,10 @@ export default function RepairsPage() {
       if (q) params.q = q;
       if (status) params.status = status;
       if (canViewAll && technician) params.technician = technician;
-
-      // مهم: أرسل التاريخ فقط بدون أوقات، عشان السيرفر يحسب بداية/نهاية اليوم محليًا
       if (quick !== "all") {
         if (startDate) params.startDate = startDate;
         if (endDate) params.endDate = endDate;
       }
-
       const data = await listRepairs(params);
       setList(data);
     } catch (e) {
@@ -184,13 +321,11 @@ export default function RepairsPage() {
     }
   }
 
-  // حمّل عند أول مرة
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // حمّل تلقائيًا عند تغير الفلاتر
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -198,8 +333,7 @@ export default function RepairsPage() {
 
   function openDeliverModal(r) {
     const isAssigned =
-      r.technician &&
-      (r.technician._id || r.technician) === (user?.id || user?._id);
+      r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
     setDeliverRequirePassword(!canEditAll && isAssigned);
     setDeliverTarget(r);
     setDeliverOpen(true);
@@ -207,29 +341,38 @@ export default function RepairsPage() {
 
   async function submitDeliver(payload) {
     try {
-      // توحيد شكل الأجزاء + التواريخ
       const parts = (payload.parts || []).map((p) => ({
         name: p.name || "",
         cost: p.cost ? Number(p.cost) : 0,
         supplier: p.supplier || undefined,
         source: p.source || undefined,
-        purchaseDate: p.purchaseDate
-          ? new Date(p.purchaseDate).toISOString()
-          : undefined,
+        purchaseDate: p.purchaseDate ? new Date(p.purchaseDate).toISOString() : undefined,
       }));
 
-      const body = {
+      // دعم تعديل السعر النهائي + السعر المبدئي من مودال التسليم إن وُجد
+      let body = {
         status: "تم التسليم",
-        finalPrice: payload.finalPrice ? Number(payload.finalPrice) : 0,
         parts,
         ...(payload.password ? { password: payload.password } : {}),
       };
+      body = includeNumberField(body, "finalPrice", payload.finalPrice);
+      body = includeNumberField(body, "price", payload.price);
 
       // مهم: استخدم updateRepair بدل updateRepairStatus
-      await updateRepair(deliverTarget._id, body);
+      const updated = await updateRepair(deliverTarget._id, body);
 
       setDeliverOpen(false);
       setDeliverTarget(null);
+
+      // منطق الضمان بعد التسليم
+      if (updated?.hasWarranty === true && !updated?.warrantyEnd) {
+        setWarrantyTarget(updated);
+        setShowWarrantyModal(true);
+      } else if (updated?.hasWarranty === true && updated?.warrantyEnd) {
+        setAfterCompleteTarget(updated);
+        setAfterCompleteOpen(true);
+      }
+
       await load();
     } catch (e) {
       alert(e?.response?.data?.message || "خطأ أثناء إتمام التسليم");
@@ -238,27 +381,50 @@ export default function RepairsPage() {
 
   async function changeStatusInline(r, nextStatus) {
     try {
+      // تم التسليم: افتح مودال التسليم فقط، وخلّي التحديث يتم من هناك
       if (nextStatus === "تم التسليم") {
         openDeliverModal(r);
         return;
       }
+
+      // مرفوض: (نفس منطق الصلاحيات/كلمة السر)
       if (nextStatus === "مرفوض") {
-        // مجرد تغيير الحالة الآن — قيمة المكان هتتحدد من الـ select المخصص اللي هيظهر
-        await updateRepairStatus(r._id, { status: nextStatus });
+        const body = { status: nextStatus };
+        const isAssigned =
+          r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
+        if (!canEditAll && isAssigned) {
+          const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
+          if (!password) return;
+          body.password = password;
+        }
+        await updateRepairStatus(r._id, body);
         await load();
         return;
       }
+
+      // الحالات الأخرى (بما فيها "مكتمل")
+      const body = { status: nextStatus };
       const isAssigned =
-        r.technician &&
-        (r.technician._id || r.technician) === (user?.id || user?._id);
-      let body = { status: nextStatus };
+        r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
       if (!canEditAll && isAssigned) {
         const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
         if (!password) return;
         body.password = password;
       }
-      await updateRepairStatus(r._id, body);
+
+      const updated = await updateRepairStatus(r._id, body);
       await load();
+
+      // منطق الضمان عند التحويل إلى "مكتمل"
+      if (nextStatus === "مكتمل") {
+        if (updated?.hasWarranty === true && !updated?.warrantyEnd) {
+          setWarrantyTarget(updated);
+          setShowWarrantyModal(true);
+        } else if (updated?.hasWarranty === true && updated?.warrantyEnd) {
+          setAfterCompleteTarget(updated);
+          setAfterCompleteOpen(true);
+        }
+      }
     } catch (e) {
       alert(e?.response?.data?.message || "حدث خطأ أثناء تحديث الحالة");
     }
@@ -267,8 +433,7 @@ export default function RepairsPage() {
   async function changeRejectedLocation(r, loc) {
     try {
       const isAssigned =
-        r.technician &&
-        (r.technician._id || r.technician) === (user?.id || user?._id);
+        r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
 
       const body = { status: "مرفوض", rejectedDeviceLocation: loc };
       if (!canEditAll && isAssigned) {
@@ -310,11 +475,10 @@ export default function RepairsPage() {
     <button
       onClick={onClick}
       className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition
-      ${
-        active
+      ${active
           ? "bg-blue-600 text-white border-blue-600"
           : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-      }`}
+        }`}
       aria-pressed={active}
     >
       <span aria-hidden="true">{icon}</span>
@@ -337,9 +501,8 @@ export default function RepairsPage() {
     };
     return (
       <span
-        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          map[s] || "bg-gray-100 dark:bg-gray-700"
-        }`}
+        className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || "bg-gray-100 dark:bg-gray-700"
+          }`}
       >
         {s}
       </span>
@@ -377,7 +540,6 @@ export default function RepairsPage() {
   return (
     <div className="space-y-4">
       {/* رأس الصفحة */}
-      {/* sticky top-0 z-20 */}
       <header className="flex items-center justify-between  bg-gradient-to-b from-white/80 to-white/0 dark:from-gray-900/80 backdrop-blur py-2">
         <h1 className="text-xl font-bold">الصيانات</h1>
         <div className="flex items-center gap-2">
@@ -558,20 +720,29 @@ export default function RepairsPage() {
             ) : (
               list.map((r) => {
                 const old = isOldRepair(r, quick, startDate, endDate);
+                const basePrice  = hasNum(r.price) ? Number(r.price) : null;
+                const finalPrice = hasNum(r.finalPrice) ? Number(r.finalPrice) : null;
                 return (
                   <tr
                     key={r._id}
-                    className={`odd:bg-gray-50 rounded-[4px] dark:odd:bg-gray-700/40 hover:bg-gray-100/60 dark:hover:bg-gray-700/60 transition ${
-                      old ? "ring-1 ring-yellow-200 dark:ring-yellow-700" : ""
-                    }`}
+                    className={`${r.hasWarranty
+                      ? "bg-amber-50/40 dark:bg-amber-900/10"
+                      : ""
+                      } odd:bg-gray-50 rounded-[4px] dark:odd:bg-gray-700/40 hover:bg-gray-100/60 dark:hover:bg-gray-700/60 transition ${old ? "ring-1 ring-yellow-200 dark:ring-yellow-700" : ""
+                      }`}
                   >
-                    <Td>
-                      {r.repairId}
-                      {old && (
-                        <span className="ml-1 px-2 py-0.5 rounded-full text-[11px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
-                          قديمة
-                        </span>
-                      )}
+                    <Td className="">
+                      <div className="flex items-center gap-2 whitespace-nowrap">
+                        <span className="font-mono">#{r.repairId}</span>
+                        {old && (
+                          <span className="px-2 py-0.5 rounded-full text-[11px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
+                            قديمة
+                          </span>
+                        )}
+                        {r.hasWarranty && (
+                          <WarrantyBadge until={r.warrantyEnd} />
+                        )}
+                      </div>
                     </Td>
                     <Td>{r.customerName}</Td>
                     <Td>{r.phone || "—"}</Td>
@@ -587,7 +758,6 @@ export default function RepairsPage() {
                     {/* <Td>{r?.createdBy?.name || r?.recipient?.name || "—"}</Td> */}
                     <Td>
                       <div className="flex items-center gap-2">
-                        {/* <StatusPill s={r.status} /> */}
                         <StatusSelect
                           value={r.status}
                           onChange={(next) => changeStatusInline(r, next)}
@@ -609,10 +779,12 @@ export default function RepairsPage() {
                       </div>
                     </Td>
                     <Td>
-                      {typeof r.finalPrice === "number" ? r.finalPrice : "—"}
+                      {finalPrice ?? basePrice ?? "—"}
+                      {/* {finalPrice !== null && basePrice !== null && finalPrice !== basePrice && (
+                        <div className="text-[11px] opacity-60">مبدئي: {basePrice}</div>
+                      )} */}
                     </Td>
                     <Td>{formatDate(r.createdAt)}</Td>
-                    {/* <Td>{r.deliveryDate ? formatDate(r.deliveryDate) : "—"}</Td> */}
                     <Td>
                       <div className="flex items-center gap-2">
                         <Link
@@ -657,89 +829,99 @@ export default function RepairsPage() {
         ) : list.length === 0 ? (
           <EmptyState />
         ) : (
-          list.map((r) => (
-            <div
-              key={r._id}
-              className="p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm"
-            >
-              <div className="flex items-center justify-between">
-                <div className="font-bold">
-                  #{r.repairId} — {r.deviceType}
-                </div>
+          list.map((r) => {
+            const basePrice  = hasNum(r.price) ? Number(r.price) : null;
+            const finalPrice = hasNum(r.finalPrice) ? Number(r.finalPrice) : null;
+            const priceLine  = finalPrice ?? basePrice ?? "—";
+            const hint       = (finalPrice !== null && basePrice !== null && finalPrice !== basePrice)
+              ? ` (مبدئي: ${basePrice})`
+              : "";
+            return (
+              <div
+                key={r._id}
+                className={`p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm ${r.hasWarranty ? "border border-amber-300/60 bg-amber-50/40 dark:bg-amber-900/10" : ""
+                  }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="font-bold flex items-center gap-2 whitespace-nowrap">
+                    <span>#{r.repairId} — {r.deviceType}</span>
+                    {r.hasWarranty && <WarrantyBadge until={r.warrantyEnd} />}
+                  </div>
                 <StatusPill s={r.status} />
-              </div>
-              <div className="text-sm opacity-80">
-                {r.customerName} • {r.phone || "—"}
-              </div>
-              <div className="text-xs opacity-70 mt-1">
-                {r?.technician?.name
-                  ? `الفني: ${r.technician.name}`
-                  : "الفني: —"}{" "}
-                • المسجّل: {r?.createdBy?.name || r?.recipient?.name || "—"}
-              </div>
+                </div>
+                <div className="text-sm opacity-80">
+                  {r.customerName} • {r.phone || "—"}
+                </div>
+                <div className="text-xs opacity-70 mt-1">
+                  {r?.technician?.name
+                    ? `الفني: ${r.technician.name}`
+                    : "الفني: —"}{" "}
+                  • المسجّل: {r?.createdBy?.name || r?.recipient?.name || "—"}
+                </div>
 
-              <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
-                <Info label="العطل" value={r.issue || "—"} />
-                <Info label="اللون" value={r.color || "—"} />
-                <Info
-                  label="السعر"
-                  value={typeof r.price === "number" ? r.price : "—"}
-                />
-                <Info label="إنشاء" value={formatDate(r.createdAt)} />
-                <Info
-                  label="التسليم"
-                  value={r.deliveryDate ? formatDate(r.deliveryDate) : "—"}
-                />
-              </div>
-
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <div className="flex gap-2">
-                  <StatusSelect
-                    value={r.status}
-                    onChange={(next) => changeStatusInline(r, next)}
+                <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
+                  <Info label="العطل" value={r.issue || "—"} />
+                  <Info label="اللون" value={r.color || "—"} />
+                  <Info
+                    label="السعر"
+                    value={`${priceLine}${hint}`}
                   />
-                  {r.status === "مرفوض" && (
-                    <select
-                      value={r.rejectedDeviceLocation || "بالمحل"}
-                      onChange={(e) =>
-                        changeRejectedLocation(r, e.target.value)
-                      }
-                      className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
-                      aria-label="مكان الجهاز عند الرفض"
+                  <Info label="إنشاء" value={formatDate(r.createdAt)} />
+                  <Info
+                    label="التسليم"
+                    value={r.deliveryDate ? formatDate(r.deliveryDate) : "—"}
+                  />
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <div className="flex gap-2">
+                    <StatusSelect
+                      value={r.status}
+                      onChange={(next) => changeStatusInline(r, next)}
+                    />
+                    {r.status === "مرفوض" && (
+                      <select
+                        value={r.rejectedDeviceLocation || "بالمحل"}
+                        onChange={(e) =>
+                          changeRejectedLocation(r, e.target.value)
+                        }
+                        className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                        aria-label="مكان الجهاز عند الرفض"
+                      >
+                        <option value="بالمحل">بالمحل</option>
+                        <option value="مع العميل">مع العميل</option>
+                      </select>
+                    )}
+                  </div>
+                  <Link
+                    to={`/repairs/${r._id}`}
+                    className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
+                  >
+                    فتح
+                  </Link>
+                  {canEditAll && (
+                    <Link
+                      to={`/repairs/${r._id}/edit`}
+                      className="px-3 py-1 rounded-lg bg-blue-600 text-white"
                     >
-                      <option value="بالمحل">بالمحل</option>
-                      <option value="مع العميل">مع العميل</option>
-                    </select>
+                      تعديل
+                    </Link>
+                  )}
+                  {canDeleteAll && (
+                    <button
+                      onClick={() => handleDelete(r)}
+                      disabled={deletingId === r._id}
+                      className="px-3 py-1 rounded-lg bg-red-600 text-white disabled:opacity-50"
+                      aria-label={`حذف الصيانة رقم ${r.repairId}`}
+                      title="حذف"
+                    >
+                      {deletingId === r._id ? "جارٍ…" : "حذف"}
+                    </button>
                   )}
                 </div>
-                <Link
-                  to={`/repairs/${r._id}`}
-                  className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
-                >
-                  فتح
-                </Link>
-                {canEditAll && (
-                  <Link
-                    to={`/repairs/${r._id}/edit`}
-                    className="px-3 py-1 rounded-lg bg-blue-600 text-white"
-                  >
-                    تعديل
-                  </Link>
-                )}
-                {canDeleteAll && (
-                  <button
-                    onClick={() => handleDelete(r)}
-                    disabled={deletingId === r._id}
-                    className="px-3 py-1 rounded-lg bg-red-600 text-white disabled:opacity-50"
-                    aria-label={`حذف الصيانة رقم ${r.repairId}`}
-                    title="حذف"
-                  >
-                    {deletingId === r._id ? "جارٍ…" : "حذف"}
-                  </button>
-                )}
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </section>
 
@@ -751,10 +933,154 @@ export default function RepairsPage() {
           setDeliverTarget(null);
         }}
         onSubmit={submitDeliver}
-        initialFinalPrice={deliverTarget ? deliverTarget.finalPrice ?? 0 : 0}
+        initialFinalPrice={deliverTarget ? (deliverTarget.finalPrice ?? deliverTarget.price ?? 0) : 0}
         initialParts={deliverTarget ? deliverTarget.parts || [] : []}
         requirePassword={deliverRequirePassword}
       />
+
+      {/* مودال تاريخ الضمان */}
+      {showWarrantyModal && (
+        <div className="fixed inset-0 grid place-items-center bg-black/40 z-50">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl w-[380px] space-y-3">
+            <h3 className="text-lg font-semibold">حدد تاريخ انتهاء الضمان</h3>
+            <input
+              type="date"
+              className="border p-2 w-full rounded-xl"
+              value={warrantyEnd}
+              onChange={(e) => setWarrantyEnd(e.target.value)}
+            />
+            <div className="flex gap-2">
+              <button
+                className="px-2 py-1 rounded-xl border"
+                onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + 7);
+                  setWarrantyEnd(d.toISOString().slice(0, 10));
+                }}
+              >
+                أسبوع
+              </button>
+              <button
+                className="px-2 py-1 rounded-xl border"
+                onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + 30);
+                  setWarrantyEnd(d.toISOString().slice(0, 10));
+                }}
+              >
+                شهر
+              </button>
+              <button
+                className="px-2 py-1 rounded-xl border"
+                onClick={() => {
+                  const d = new Date();
+                  d.setDate(d.getDate() + 90);
+                  setWarrantyEnd(d.toISOString().slice(0, 10));
+                }}
+              >
+                3 شهور
+              </button>
+            </div>
+            <div className="flex justify-end gap-2">
+              <button
+                className="px-3 py-2 rounded-xl border"
+                onClick={() => {
+                  setShowWarrantyModal(false);
+                  setWarrantyTarget(null);
+                  setWarrantyEnd("");
+                }}
+              >
+                إلغاء
+              </button>
+              <button
+                className="px-3 py-2 rounded-xl bg-blue-600 text-white"
+                onClick={async () => {
+                  if (!warrantyTarget || !warrantyEnd) return;
+                  await setWarranty(warrantyTarget._id, {
+                    hasWarranty: true,
+                    warrantyEnd,
+                  });
+                  setShowWarrantyModal(false);
+                  setWarrantyEnd("");
+
+                  // بعد تحديد الضمان، لو الحالة بالفعل مكتمل/تم التسليم افتح مودال الإجراءات
+                  try {
+                    const fresh = await API.get(`/repairs/${warrantyTarget._id}`).then(r => r.data);
+                    setWarrantyTarget(null);
+                    if (["مكتمل", "تم التسليم"].includes(fresh?.status)) {
+                      setAfterCompleteTarget(fresh);
+                      setAfterCompleteOpen(true);
+                    }
+                    await load();
+                  } catch {
+                    await load();
+                  }
+                }}
+              >
+                حفظ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {afterCompleteOpen && (
+        <AfterCompleteModal
+          open={afterCompleteOpen}
+          onClose={() => setAfterCompleteOpen(false)}
+          onPrint={() => handlePrintReceipt(afterCompleteTarget)}
+          onWhatsApp={() => handleWhatsAppMessage(afterCompleteTarget)}
+        />
+      )}
+    </div>
+  );
+}
+
+// ======== NEW: شارة الضمان (مُعاد استخدامها) ========
+function WarrantyBadge({ until }) {
+  return (
+    <span
+      title={until ? `ضمان حتى ${formatDate(until)}` : "ضمان"}
+      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
+    >
+      <svg viewBox="0 0 24 24" className="w-3 h-3" fill="currentColor" aria-hidden="true">
+        <path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4zM8 11l2 2 4-4 1.5 1.5L10 15l-3.5-3.5L8 11z" />
+      </svg>
+      ضمان
+    </span>
+  );
+}
+
+// ======== NEW: AfterCompleteModal ========
+function AfterCompleteModal({ open, onClose, onPrint, onWhatsApp }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
+        <h3 className="text-lg font-semibold">تم إنهاء العملية</h3>
+        <p className="text-sm opacity-80">
+          هل تودّ طباعة إيصال الضمان أو مراسلة العميل على واتساب؟
+        </p>
+        <div className="grid sm:grid-cols-2 gap-2">
+          <button
+            className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
+            onClick={() => onPrint?.()}
+          >
+            طباعة إيصال الضمان
+          </button>
+          <button
+            className="px-3 py-2 rounded-xl bg-green-600 text-white"
+            onClick={() => onWhatsApp?.()}
+          >
+            إرسال رسالة واتساب
+          </button>
+        </div>
+        <div className="flex justify-end">
+          <button className="px-3 py-2 rounded-xl border" onClick={onClose}>
+            إغلاق
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

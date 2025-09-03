@@ -12,6 +12,7 @@ input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   -webkit-box-shadow: 0 0 0 40px white inset !important;
 }
+
 .ul-list {
   list-style-type: none;
 }
@@ -31,34 +32,41 @@ input:-webkit-autofill:active {
   color: #494949;
   font-weight: bold;
 }
+
 nav.navbar a {
   padding: 10px 8px;
   background: #ababab;
   border-radius: 5px;
   color: #ffffff;
 }
+
 nav.navbar a.active {
   background: #0098ec;
   padding: 10px 8px;
   border-radius: 5px;
   color: #ffffff;
 }
+
 .dark input:not([type="checkbox"]),
 .dark input:not([type="checkbox"]):-webkit-autofill,
 .dark input:not([type="checkbox"]):-webkit-autofill:hover,
 .dark input:not([type="checkbox"]):-webkit-autofill:focus,
 .dark input:not([type="checkbox"]):-webkit-autofill:active,
-.dark select {
+.dark select,
+.dark textarea {
   background: #111827 !important;
   -webkit-box-shadow: 0 0 0 40px #111827 inset !important;
   color: #ffffff !important;
 }
+
 select {
   outline: none;
 }
+
 .date-filters input {
   width: 130px;
 }
+
 .dark nav.navbar a {
   background: #1f2937;
 }
@@ -69,16 +77,19 @@ select {
 
 input::-webkit-calendar-picker-indicator {
   filter: invert(1);
-  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="7" viewBox="0 0 24 24"><path fill="%23FF0000" d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z"/></svg>')
-    no-repeat;
+  background: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="8" height="7" viewBox="0 0 24 24"><path fill="%23FF0000" d="M20 3h-1V1h-2v2H7V1H5v2H4c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 18H4V8h16v13z"/></svg>') no-repeat;
   background-size: contain;
-  color: transparent; /* Hide the original icon */
+  color: transparent;
+  /* Hide the original icon */
 }
+
 .box-with-icon {
   width: 100%;
+
   .input-field {
     width: 100%;
   }
+
   input {
     border-top-left-radius: 0;
     border-left: 1px solid #ccc;
@@ -86,6 +97,7 @@ input::-webkit-calendar-picker-indicator {
     width: 100%;
   }
 }
+
 .box-with-icon button {
   border-radius: 10px;
   border-top-right-radius: 0;
@@ -97,9 +109,11 @@ input::-webkit-calendar-picker-indicator {
 .show-mobile-repairs-filter-btn {
   transition: bottom 0.3s linear;
 }
+
 .mobile-repairs-filters.show {
   bottom: 12px;
 }
+
 .date-filter {
   display: flex;
   column-gap: 5px;
@@ -113,19 +127,19 @@ input::-webkit-calendar-picker-indicator {
   position: relative;
   overflow: hidden;
 }
+
 .skel::after {
   content: "";
   position: absolute;
   inset: 0;
   transform: translateX(-100%);
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(255, 255, 255, 0.2),
-    transparent
-  );
+  background: linear-gradient(90deg,
+      transparent,
+      rgba(255, 255, 255, 0.2),
+      transparent);
   animation: skel-shimmer 1.2s infinite;
 }
+
 @keyframes skel-shimmer {
   100% {
     transform: translateX(100%);
@@ -136,6 +150,7 @@ input::-webkit-calendar-picker-indicator {
   .date-filter input {
     width: 91px;
   }
+
   .mobile-repairs-filters {
     background: #333;
     z-index: 9999;
@@ -144,6 +159,7 @@ input::-webkit-calendar-picker-indicator {
     bottom: -500px;
     transition: bottom 0.3s ease-in-out;
   }
+
   .page-filter input,
   .page-filter button,
   .page-filter select {
@@ -153,6 +169,7 @@ input::-webkit-calendar-picker-indicator {
   .repairs-parts-box thead tr th {
     min-width: 130px;
   }
+
   .repairs-parts-box input.inp {
     width: 100% !important;
   }
@@ -161,11 +178,13 @@ input::-webkit-calendar-picker-indicator {
     width: 110px;
     margin: 0;
   }
+
   select.transition-colors {
     width: 115px;
     padding-right: 0;
     font-size: 13px;
   }
+
   .dark .delevryModel input {
     border: 1px solid #2d2b3d;
     margin-top: 10px !important;
@@ -184,6 +203,42 @@ input::-webkit-calendar-picker-indicator {
   .delevryModel {
     margin: 0 !important;
   }
+
+  #root {
+    padding-bottom: 50px;
+  }
+
+  section.sticky.top-\[70px\] #startDate,
+  section.sticky.top-\[70px\] #endDate {
+    width: 59px;
+  }
+
+  section.sticky.top-\[70px\] .submit-btn {
+    display: none;
+  }
+
+  .box-with-icon button {
+    margin: 0;
+  }
+
+  .repair-edit-page .input-field input {
+    font-size: 14px;
+    border-radius: 5px !important;
+    border: none;
+    height: 40px;
+  }
+
+  .repair-edit-page .input-field+div button {
+    height: 40px;
+  }
+
+  .repair-edit-page .input-field input::placeholder {
+    font-size: 12px;
+  }
+}
+
+.fixed {
+  margin-top: 0 !important;
 }
 
 .btn.sun-mode-button svg,
@@ -196,6 +251,40 @@ input::-webkit-calendar-picker-indicator {
 .btn.sun-mode-button svg {
   fill: yellow;
 }
+
 .btn.moon-mode-button svg {
   fill: darkslategray;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+/* Special */
+.goldOne section {
+  border: 3px solid gold;
 }

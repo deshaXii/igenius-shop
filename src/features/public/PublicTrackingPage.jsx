@@ -110,6 +110,24 @@ export default function PublicTrackingPage() {
           )}
         </section>
       )}
+
+       {/* Updates timeline */}
+       {data?.repair?.updates?.length > 0 && (
+        <section className="mt-4 p-3 rounded-2xl border">
+          <div className="font-semibold mb-2">تحديثات من الفني</div>
+          <div className="grid gap-3">
+            {data.repair.updates.map((u, idx)=>(
+              <div key={idx} className="p-2 rounded-xl bg-gray-50 dark:bg-gray-700/40">
+                <div className="text-xs opacity-70">{fmt(u.createdAt)}</div>
+                {u.type === 'text' && <div className="font-medium whitespace-pre-wrap">{u.text}</div>}
+                {u.type === 'image' && <img alt="" src={u.fileUrl} className="max-h-64 rounded-xl" />}
+                {u.type === 'video' && <video controls src={u.fileUrl} className="rounded-xl" />}
+                {u.type === 'audio' && <audio controls src={u.fileUrl} />}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

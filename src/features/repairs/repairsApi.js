@@ -33,3 +33,14 @@ export function updateRepairStatus(
   }
   return API.put(`/repairs/${id}`, body).then((r) => r.data);
 }
+
+// Set or update warranty
+export function setWarranty(id, { hasWarranty = true, warrantyEnd, warrantyNotes = "" }) {
+  const body = { hasWarranty, warrantyEnd, warrantyNotes };
+  return API.post(`/repairs/${id}/warranty`, body).then((r) => r.data);
+}
+
+// Create customer-facing update
+export function createCustomerUpdate(id, payload) {
+  return API.post(`/repairs/${id}/customer-updates`, payload).then((r) => r.data);
+}
