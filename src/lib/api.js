@@ -2,8 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_URL || "https://igenius-shop-api.vercel.app/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
   withCredentials: true, // ما بيضرش حتى لو مش بتستخدم كوكي
 });
 

@@ -22,7 +22,7 @@ export default function SocketProvider({ children }) {
         origin:
           process.env.NODE_ENV === "development"
             ? "http://localhost:3000"
-            : "https://igenius-shop-api.vercel.app",
+            : "http://localhost:5000",
         credentials: true,
       },
       transports: ["websocket", "polling"],
