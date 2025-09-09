@@ -1,4 +1,3 @@
-// src/features/auth/authStore.js
 import { create } from "zustand";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -14,10 +13,10 @@ const useAuthStore = create((set, get) => ({
     return Date.now() - t > DAY_MS;
   },
 
-  login: (token, user) => {
+  setAuth: ({ token, user }) => {
     const now = Date.now();
-    localStorage.setItem("token", token);
-    localStorage.setItem("user", JSON.stringify(user));
+    if (token) localStorage.setItem("token", token);
+    if (user) localStorage.setItem("user", JSON.stringify(user));
     localStorage.setItem("loginTime", String(now));
     set({ token, user, loginTime: now });
   },

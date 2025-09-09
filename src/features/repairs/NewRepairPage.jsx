@@ -1,20 +1,24 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import API from "../../lib/api";
-import { createRepair } from "./repairsApi";
 import InputField from "../../components/InputField";
 import VoiceInput from "../../components/VoiceInput";
 import QrAfterCreateModal from "../../components/QrAfterCreateModal";
+import API, { RepairsAPI, DepartmentsAPI } from "../../lib/api";
+/* جديد: مكوّنات اختيار الصنف والمورّد */
+import InventoryItemSelect from "../../components/parts/InventoryItemSelect";
+import SupplierSelect from "../../components/parts/SupplierSelect";
 
 export default function NewRepairPage() {
   const nav = useNavigate();
-  const [techs, setTechs] = useState([]);
   const [saving, setSaving] = useState(false);
   const [hasWarranty, setHasWarranty] = useState(false);
 
   const [qrOpen, setQrOpen] = useState(false);
   const [trackingUrl, setTrackingUrl] = useState("");
   const [createdRepair, setCreatedRepair] = useState(null);
+
+  const [deps, setDeps] = useState([]);
+  const [techs, setTechs] = useState([]);
 
   const [form, setForm] = useState({
     customerName: "",
@@ -23,19 +27,25 @@ export default function NewRepairPage() {
     color: "",
     issue: "",
     price: "",
-    technician: "",
     notes: "",
     parts: [],
+    initialDepartment: "",
+    technician: "", // اختياري
   });
 
   useEffect(() => {
-    (async () => {
-      try {
-        const t = await API.get("/technicians").then((r) => r.data);
-        setTechs(t);
-      } catch {}
-    })();
+    DepartmentsAPI.list().then(setDeps);
   }, []);
+
+  useEffect(() => {
+    if (form.initialDepartment) {
+      API.get(`/technicians?department=${form.initialDepartment}`)
+        .then((r) => setTechs(r.data))
+        .catch(() => setTechs([]));
+    } else {
+      setTechs([]);
+    }
+  }, [form.initialDepartment]);
 
   function setField(k, v) {
     setForm((prev) => ({ ...prev, [k]: v }));
@@ -47,6 +57,10 @@ export default function NewRepairPage() {
       parts: [
         ...prev.parts,
         {
+          itemId: "",
+          itemName: "",
+          supplierId: "",
+          paid: false,
           name: "",
           cost: "",
           supplier: "",
@@ -76,13 +90,24 @@ export default function NewRepairPage() {
       alert("الرجاء إدخال اسم العميل ونوع الجهاز");
       return;
     }
+    if (!form.initialDepartment) {
+      alert("اختر القسم الابتدائي");
+      return;
+    }
     setSaving(true);
     try {
-      const priceNum = form.price ? Number(form.price) : 0;
       const payload = {
-        ...form,
+        customerName: form.customerName,
+        phone: form.phone,
+        deviceType: form.deviceType,
+        color: form.color || undefined,
+        issue: form.issue,
         hasWarranty,
-        price: priceNum,
+        price: form.price ? Number(form.price) : 0,
+        notes: form.notes || undefined,
+        initialDepartment: form.initialDepartment,
+        ...(form.technician ? { technician: form.technician } : {}),
+        // إبقاء الـ payload متوافقًا مع الـ API الحالي
         parts: form.parts.map((p) => ({
           name: p.name,
           cost: p.cost ? Number(p.cost) : 0,
@@ -91,10 +116,11 @@ export default function NewRepairPage() {
           purchaseDate: p.purchaseDate
             ? new Date(p.purchaseDate).toISOString()
             : undefined,
+          // الحقول الإضافية واجهية فقط: itemId/itemName/supplierId/paid
         })),
       };
 
-      const created = await createRepair(payload);
+      const created = await RepairsAPI.create(payload);
 
       const token = created?.publicTracking?.token;
       const url = token ? `${window.location.origin}/t/${token}` : "";
@@ -124,11 +150,12 @@ export default function NewRepairPage() {
               placeholder="ادخل اسم العميل"
               required
             />
-            <div className="">
+            <div>
               <VoiceInput onText={(text) => setField("customerName", text)} />
             </div>
           </div>
         </Field>
+
         <Field label="هاتف">
           <div className="relative flex items-center justify-center box-with-icon">
             <InputField
@@ -138,11 +165,12 @@ export default function NewRepairPage() {
               placeholder="ادخل رقم الهاتف"
               required
             />
-            <div className="">
+            <div>
               <VoiceInput onText={(text) => setField("phone", text)} />
             </div>
           </div>
         </Field>
+
         <Field label="نوع الجهاز">
           <div className="relative flex items-center justify-center box-with-icon">
             <InputField
@@ -152,11 +180,12 @@ export default function NewRepairPage() {
               placeholder="ادخل نوع الجهاز"
               required
             />
-            <div className="">
+            <div>
               <VoiceInput onText={(text) => setField("deviceType", text)} />
             </div>
           </div>
         </Field>
+
         <Field label="اللون">
           <div className="relative flex items-center justify-center box-with-icon">
             <InputField
@@ -165,11 +194,12 @@ export default function NewRepairPage() {
               onChange={(e) => setField("color", e.target.value)}
               placeholder="ادخل اللون"
             />
-            <div className="">
+            <div>
               <VoiceInput onText={(text) => setField("color", text)} />
             </div>
           </div>
         </Field>
+
         <Field label="العطل">
           <div className="relative flex items-center justify-center box-with-icon">
             <InputField
@@ -179,10 +209,11 @@ export default function NewRepairPage() {
               placeholder="ادخل العطل"
               required
             />
-            <div className="">
+            <div>
               <VoiceInput onText={(text) => setField("issue", text)} />
             </div>
           </div>
+
           <div className="warranty-box mt-2">
             <label className="flex items-center gap-2 text-sm">
               <input
@@ -194,6 +225,7 @@ export default function NewRepairPage() {
             </label>
           </div>
         </Field>
+
         <Field label="السعر المبدئي">
           <div className="relative flex items-center justify-center box-with-icon">
             <InputField
@@ -202,26 +234,12 @@ export default function NewRepairPage() {
               onChange={(e) => setField("price", e.target.value)}
               placeholder="ادخل السعر المبدئي"
             />
-            <div className="">
+            <div>
               <VoiceInput onText={(text) => setField("price", text)} />
             </div>
           </div>
         </Field>
-        <Field label="الفني المسؤول">
-          <select
-            value={form.technician}
-            required
-            onChange={(e) => setField("technician", e.target.value)}
-            className="inp w-full"
-          >
-            <option value="">—</option>
-            {techs.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+
         <Field label="ملاحظات">
           <div className="relative flex items-center justify-center box-with-icon">
             <InputField
@@ -230,13 +248,52 @@ export default function NewRepairPage() {
               onChange={(e) => setField("notes", e.target.value)}
               placeholder="ادخل ملاحظاتك"
             />
-            <div className="">
+            <div>
               <VoiceInput onText={(text) => setField("notes", text)} />
             </div>
           </div>
         </Field>
       </section>
 
+      <div>
+        <label className="block mb-1 text-sm">القسم الابتدائي</label>
+        <select
+          className="border rounded-lg px-3 py-2 w-full"
+          value={form.initialDepartment}
+          onChange={(e) =>
+            setForm((v) => ({ ...v, initialDepartment: e.target.value }))
+          }
+          required
+        >
+          <option value="">— اختر قسمًا —</option>
+          {deps.map((d) => (
+            <option key={d._id} value={d._id}>
+              {d.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label className="block mb-1 text-sm">فنّي (اختياري)</label>
+        <select
+          className="border rounded-lg px-3 py-2 w-full"
+          value={form.technician}
+          onChange={(e) =>
+            setForm((v) => ({ ...v, technician: e.target.value }))
+          }
+          disabled={!form.initialDepartment}
+        >
+          <option value="">— بدون تعيين —</option>
+          {techs.map((t) => (
+            <option key={t._id} value={t._id}>
+              {t.name || t.username || t.email}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {/* قطع الغيار (الجدول الجديد) */}
       <section className="p-3 rounded-xl bg-white dark:bg-gray-800">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold">قطع الغيار</h2>
@@ -244,21 +301,23 @@ export default function NewRepairPage() {
             onClick={addPart}
             className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
           >
-            + إضافة قطعة
+            إضافة قطعة
           </button>
         </div>
         {form.parts.length === 0 ? (
           <div className="opacity-70">لا توجد قطع</div>
         ) : (
-          <div className="w-full repairs-parts-box overflow-x-auto">
-            <table className="w-full text-sm">
+          <div className="overflow-x-auto repairs-parts-box w-full">
+            <table className="w-full text-sm repair-parts-table">
               <thead>
                 <tr className="text-right">
-                  <th className="p-2">الاسم</th>
+                  <th className="p-2">الصنف (من المخزن)</th>
+                  <th className="p-2">اسم القطعة</th>
                   <th className="p-2">التكلفة</th>
                   <th className="p-2">المورد</th>
                   <th className="p-2">بواسطة</th>
                   <th className="p-2">تاريخ الشراء</th>
+                  <th className="p-2">مدفوعة؟</th>
                   <th className="p-2">حذف</th>
                 </tr>
               </thead>
@@ -268,11 +327,28 @@ export default function NewRepairPage() {
                     key={i}
                     className="odd:bg-gray-50 dark:odd:bg-gray-700/40"
                   >
+                    <td className="p-2 min-w-[220px]">
+                      <InventoryItemSelect
+                        value={p.itemId || ""}
+                        onChange={(id, obj) => {
+                          updatePart(i, "itemId", id);
+                          updatePart(i, "itemName", obj?.name || "");
+                          if (!p.name && obj?.name)
+                            updatePart(i, "name", obj.name);
+                          if (
+                            (p.cost === "" || p.cost === null) &&
+                            typeof obj?.unitCost === "number"
+                          ) {
+                            updatePart(i, "cost", obj.unitCost);
+                          }
+                        }}
+                      />
+                    </td>
                     <td className="p-2">
                       <input
                         value={p.name}
                         onChange={(e) => updatePart(i, "name", e.target.value)}
-                        className="inp w-full"
+                        className="inp"
                       />
                     </td>
                     <td className="p-2">
@@ -283,13 +359,17 @@ export default function NewRepairPage() {
                         className="inp w-28"
                       />
                     </td>
-                    <td className="p-2">
-                      <input
-                        value={p.supplier}
-                        onChange={(e) =>
-                          updatePart(i, "supplier", e.target.value)
-                        }
-                        className="inp w-full"
+                    <td className="p-2 min-w-[180px]">
+                      <SupplierSelect
+                        value={p.supplierId || ""}
+                        onChange={(id, obj) => {
+                          updatePart(i, "supplierId", id);
+                          updatePart(
+                            i,
+                            "supplier",
+                            obj ? (obj.isShop ? "المحل" : obj.name) : ""
+                          );
+                        }}
                       />
                     </td>
                     <td className="p-2">
@@ -298,7 +378,7 @@ export default function NewRepairPage() {
                         onChange={(e) =>
                           updatePart(i, "source", e.target.value)
                         }
-                        className="inp w-full"
+                        className="inp"
                       />
                     </td>
                     <td className="p-2">
@@ -308,7 +388,16 @@ export default function NewRepairPage() {
                         onChange={(e) =>
                           updatePart(i, "purchaseDate", e.target.value)
                         }
-                        className="inp w-full"
+                        className="inp"
+                      />
+                    </td>
+                    <td className="p-2 text-center">
+                      <input
+                        type="checkbox"
+                        checked={!!p.paid}
+                        onChange={(e) =>
+                          updatePart(i, "paid", e.target.checked)
+                        }
                       />
                     </td>
                     <td className="p-2">
@@ -340,6 +429,7 @@ export default function NewRepairPage() {
         trackingUrl={trackingUrl}
         repair={createdRepair}
       />
+
       <div className="flex items-center gap-2">
         <button
           onClick={submit}

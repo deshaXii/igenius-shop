@@ -7,6 +7,7 @@ import ProtectedRoute from "./features/auth/ProtectedRoute";
 import PublicOnlyRoute from "./features/auth/PublicOnlyRoute";
 import PublicTrackingPage from "./features/public/PublicTrackingPage";
 import ReceiptPage from "./features/repairs/ReceiptPage";
+import DepartmentsPage from "./features/departments/DepartmentsPage";
 
 import RepairsPage from "./features/repairs/RepairsPage";
 import NewRepairPage from "./features/repairs/NewRepairPage";
@@ -25,6 +26,10 @@ import SettingsPage from "./features/settings/SettingsPage";
 import ChatPage from "./features/chat/ChatPage";
 import DirectChatPage from "./features/chat/DirectChatPage";
 
+import InventoryPage from "./features/inventory/InventoryPage";
+import SuppliersPage from "./features/suppliers/SuppliersPage";
+import SupplierDetailsPage from "./features/suppliers/SupplierDetailsPage";
+
 import RequirePermRoute from "./features/auth/RequirePermRoute";
 
 export default function App() {
@@ -38,6 +43,7 @@ export default function App() {
       {/* صفحات محمية */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
+          <Route path="/settings/departments" element={<DepartmentsPage />} />
           <Route index element={<Navigate to="/repairs" replace />} />
           <Route path="/repairs" element={<RepairsPage />} />
           <Route path="/repairs/new" element={<NewRepairPage />} />
@@ -45,6 +51,9 @@ export default function App() {
           <Route path="/repairs/:id" element={<RepairDetailsPage />} />
           <Route path="/repairs/:id/edit" element={<EditRepairPage />} />
           <Route path="/technicians" element={<TechniciansPage />} />
+          <Route path="/inventory" element={<InventoryPage />} />
+          <Route path="/suppliers" element={<SuppliersPage />} />
+          <Route path="/suppliers/:id" element={<SupplierDetailsPage />} />
           <Route
             path="/technicians/:id/profile"
             element={<TechnicianProfilePage />}

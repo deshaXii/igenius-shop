@@ -1,17 +1,24 @@
-// src/components/DeliveryModal.jsx
 import { useEffect, useState } from "react";
+import SupplierSelect from "./parts/SupplierSelect";
+import InventoryItemSelect from "./parts/InventoryItemSelect";
+
+function toNum(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : "";
+}
 
 export default function DeliveryModal({
   open,
   onClose,
-  onSubmit, // ({ finalPrice, parts, password? })
+  onSubmit,
   initialFinalPrice = 0,
   initialParts = [],
   requirePassword = false,
 }) {
   const [finalPrice, setFinalPrice] = useState(initialFinalPrice || 0);
-  const [parts, setParts] = useState([]);
+  const [price, setPrice] = useState("");
   const [password, setPassword] = useState("");
+  const [parts, setParts] = useState([]);
 
   useEffect(() => {
     if (open) {
@@ -19,219 +26,266 @@ export default function DeliveryModal({
       setParts(
         (initialParts || []).map((p) => ({
           name: p.name || "",
-          source: p.source || "",
-          supplier: p.supplier || "",
-          // لو ISO → نحول ل yyyy-mm-dd للإنبوت
-          purchaseDate: p.purchaseDate
-            ? new Date(p.purchaseDate).toISOString().slice(0, 10)
-            : "",
           cost: p.cost ?? "",
+          // NEW fields (optional, للتوافق)
+          supplierId: p.supplierId || "",
+          supplier: p.supplier || "", // نص
+          itemId: p.itemId || "",
+          itemName: p.itemName || "",
+          paid: !!p.paid,
+          source: p.source || "",
+          purchaseDate: p.purchaseDate
+            ? String(p.purchaseDate).slice(0, 10)
+            : "",
         }))
       );
       setPassword("");
+      setPrice("");
     }
   }, [open, initialFinalPrice, initialParts]);
 
   function addPart() {
-    setParts((arr) => [
-      ...arr,
+    setParts((prev) => [
+      ...prev,
       {
         name: "",
-        source: "",
-        supplier: "",
-        purchaseDate: new Date().toISOString().slice(0, 10),
         cost: "",
+        supplierId: "",
+        supplier: "",
+        itemId: "",
+        itemName: "",
+        paid: false,
+        source: "",
+        purchaseDate: new Date().toISOString().slice(0, 10),
       },
     ]);
   }
-
   function updatePart(i, k, v) {
-    setParts((arr) => {
-      const a = arr.slice();
-      a[i] = { ...a[i], [k]: v };
-      return a;
+    setParts((prev) => {
+      const next = prev.slice();
+      next[i] = { ...next[i], [k]: v };
+      // Sync الاسم تلقائيًا من صنف المخزن لو فاضي
+      if (k === "itemId") {
+        const item = v?.obj || null;
+      }
+      return next;
     });
   }
-
+  function onSupplierChange(i, id, obj) {
+    setParts((prev) => {
+      const next = prev.slice();
+      next[i] = {
+        ...next[i],
+        supplierId: id,
+        supplier: obj ? (obj.isShop ? "المحل" : obj.name) : "",
+      };
+      return next;
+    });
+  }
+  function onItemChange(i, id, obj) {
+    setParts((prev) => {
+      const next = prev.slice();
+      next[i] = {
+        ...next[i],
+        itemId: id,
+        itemName: obj?.name || next[i].itemName,
+      };
+      if (!next[i].name && obj?.name) next[i].name = obj.name;
+      // لو سعر القطعة فاضي، ومتوفر unitCost من المخزن
+      if (
+        (next[i].cost === "" || next[i].cost === null) &&
+        typeof obj?.unitCost === "number"
+      ) {
+        next[i].cost = obj.unitCost;
+      }
+      return next;
+    });
+  }
   function removePart(i) {
-    setParts((arr) => arr.filter((_, idx) => idx !== i));
+    setParts((prev) => prev.filter((_, idx) => idx !== i));
   }
 
   function submit() {
-    const fp = Number(finalPrice) || 0;
-    const cleanParts = parts
-      .filter((p) => (p.name || "").trim() !== "" || p.cost) // لو اسم فاضي بالكامل وسيبها مفيش مشكله؛ لكن بنشيل الصفوف الفاضية
-      .map((p) => ({
-        name: (p.name || "").trim(),
-        source: (p.source || "").trim() || undefined,
-        supplier: (p.supplier || "").trim() || undefined,
+    const payload = {
+      finalPrice: toNum(finalPrice),
+      price: price === "" ? undefined : toNum(price),
+      password: requirePassword ? password : undefined,
+      parts: parts.map((p) => ({
+        name: p.name || p.itemName || "قطعة",
+        cost: p.cost === "" || p.cost === null ? 0 : Number(p.cost),
+        supplier: p.supplier || undefined, // نص (للتوافق)
+        supplierId: p.supplierId || undefined, // ربط بالمورد
+        itemId: p.itemId || undefined, // ربط بالمخزن
+        itemName: p.itemName || undefined,
+        paid: !!p.paid,
+        source: p.source || undefined,
         purchaseDate: p.purchaseDate
           ? new Date(p.purchaseDate).toISOString()
           : undefined,
-        cost: p.cost ? Number(p.cost) : 0,
-      }));
-    const payload = { finalPrice: fp, parts: cleanParts };
-    if (requirePassword) {
-      if (!password) {
-        alert("مطلوب كلمة السر للتأكيد");
-        return;
-      }
-      payload.password = password;
-    }
+      })),
+    };
     onSubmit?.(payload);
   }
 
   if (!open) return null;
-
   return (
-    <div className="delevryModel fixed inset-0 z-[1000] flex items-center justify-center bg-black/50">
-      <div className="w-[95vw] max-w-3xl rounded-2xl bg-white dark:bg-gray-900 p-4 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold">
-            تأكيد التسليم — السعر النهائي وقطع الغيار
-          </h2>
-          <button
-            onClick={onClose}
-            className="px-2 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
-          >
-            إغلاق
-          </button>
-        </div>
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 w-[980px] max-w-[95vw] rounded-2xl p-4 space-y-3 shadow-xl">
+        <h3 className="text-lg font-semibold">إتمام التسليم</h3>
 
-        <div className="grid md:grid-cols-2 gap-3">
-          <label className="space-y-1">
-            <div className="text-sm opacity-80">السعر النهائي</div>
+        <div className="grid md:grid-cols-4 gap-2">
+          <div className="md:col-span-2">
+            <label className="text-sm opacity-80">السعر النهائي *</label>
             <input
               type="number"
+              className="inp w-full"
               value={finalPrice}
               onChange={(e) => setFinalPrice(e.target.value)}
-              className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800"
+              required
             />
-          </label>
+          </div>
+          <div>
+            <label className="text-sm opacity-80">
+              السعر المبدئي (اختياري)
+            </label>
+            <input
+              type="number"
+              className="inp w-full"
+              value={price}
+              onChange={(e) => setPrice(e.target.value)}
+            />
+          </div>
           {requirePassword && (
-            <label className="space-y-1">
-              <div className="text-sm opacity-80">
-                كلمة السر (للفني المعيّن)
-              </div>
+            <div>
+              <label className="text-sm opacity-80">كلمة السر للتأكيد</label>
               <input
                 type="password"
+                className="inp w-full"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800"
               />
-            </label>
+            </div>
           )}
         </div>
 
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">قطع الغيار</h3>
-            <button
-              onClick={addPart}
-              className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
-            >
-              + إضافة قطعة
-            </button>
-          </div>
-          {parts.length === 0 ? (
-            <div className="opacity-70">لا توجد قطع</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-right">
-                    <th className="p-2">الاسم</th>
-                    <th className="p-2">بواسطة</th>
-                    <th className="p-2">المورد</th>
-                    <th className="p-2">تاريخ الشراء</th>
-                    <th className="p-2">التكلفة</th>
-                    <th className="p-2">حذف</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {parts.map((p, i) => (
-                    <tr
-                      key={i}
-                      className="odd:bg-gray-50 dark:odd:bg-gray-800/40"
-                    >
-                      <td className="p-2">
-                        <input
-                          value={p.name}
-                          onChange={(e) =>
-                            updatePart(i, "name", e.target.value)
-                          }
-                          className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-900"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          value={p.source}
-                          onChange={(e) =>
-                            updatePart(i, "source", e.target.value)
-                          }
-                          className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-900"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          value={p.supplier}
-                          onChange={(e) =>
-                            updatePart(i, "supplier", e.target.value)
-                          }
-                          className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-900"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="date"
-                          value={p.purchaseDate || ""}
-                          onChange={(e) =>
-                            updatePart(i, "purchaseDate", e.target.value)
-                          }
-                          className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-900"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          value={p.cost}
-                          onChange={(e) =>
-                            updatePart(i, "cost", e.target.value)
-                          }
-                          className="px-2 py-1 rounded bg-gray-100 dark:bg-gray-900 w-28"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <button
-                          onClick={() => removePart(i)}
-                          className="px-2 py-1 rounded-lg bg-red-500 text-white"
-                        >
-                          حذف
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <div className="flex items-center justify-end gap-2">
+        {/* قطع الغيار */}
+        <div className="flex items-center justify-between">
+          <h4 className="font-semibold">قطع الغيار</h4>
           <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-gray-200 dark:bg-gray-700"
+            onClick={addPart}
+            className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
           >
+            إضافة قطعة
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-right">
+                <Th>الصنف (من المخزن)</Th>
+                <Th>اسم القطعة</Th>
+                <Th>التكلفة</Th>
+                <Th>المورد</Th>
+                <Th>المُدخل</Th>
+                <Th>تاريخ الشراء</Th>
+                <Th>مدفوعة؟</Th>
+                <Th>حذف</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {parts.map((p, i) => (
+                <tr key={i} className="odd:bg-gray-50 dark:odd:bg-gray-700/40">
+                  <Td className="min-w-[220px]">
+                    <InventoryItemSelect
+                      value={p.itemId || ""}
+                      onChange={(id, obj) => onItemChange(i, id, obj)}
+                    />
+                  </Td>
+                  <Td>
+                    <input
+                      className="inp w-44"
+                      value={p.name}
+                      onChange={(e) => updatePart(i, "name", e.target.value)}
+                    />
+                  </Td>
+                  <Td>
+                    <input
+                      type="number"
+                      className="inp w-24"
+                      value={p.cost}
+                      onChange={(e) => updatePart(i, "cost", e.target.value)}
+                    />
+                  </Td>
+                  <Td className="min-w-[180px]">
+                    <SupplierSelect
+                      value={p.supplierId || ""}
+                      onChange={(id, obj) => onSupplierChange(i, id, obj)}
+                    />
+                  </Td>
+                  <Td>
+                    <input
+                      className="inp w-28"
+                      value={p.source || ""}
+                      onChange={(e) => updatePart(i, "source", e.target.value)}
+                      placeholder="مثلاً: أحمد"
+                    />
+                  </Td>
+                  <Td>
+                    <input
+                      type="date"
+                      className="inp w-40"
+                      value={p.purchaseDate || ""}
+                      onChange={(e) =>
+                        updatePart(i, "purchaseDate", e.target.value)
+                      }
+                    />
+                  </Td>
+                  <Td className="text-center">
+                    <input
+                      type="checkbox"
+                      checked={!!p.paid}
+                      onChange={(e) => updatePart(i, "paid", e.target.checked)}
+                    />
+                  </Td>
+                  <Td>
+                    <button
+                      onClick={() => removePart(i)}
+                      className="px-2 py-1 rounded-lg bg-red-500 text-white"
+                    >
+                      حذف
+                    </button>
+                  </Td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <button className="px-3 py-2 rounded-xl border" onClick={onClose}>
             إلغاء
           </button>
           <button
+            className="px-3 py-2 rounded-xl bg-blue-600 text-white"
             onClick={submit}
-            className="px-4 py-2 rounded-xl bg-blue-600 text-white"
           >
-            تأكيد التسليم
+            تم
           </button>
         </div>
+
+        <style>{`.inp{padding:.5rem .75rem;border-radius:.75rem;background:var(--inp-bg,#f3f4f6);}`}</style>
       </div>
     </div>
   );
+}
+
+function Th({ children }) {
+  return (
+    <th className="p-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b">
+      {children}
+    </th>
+  );
+}
+function Td({ children, className = "" }) {
+  return <td className={`p-2 ${className}`}>{children}</td>;
 }

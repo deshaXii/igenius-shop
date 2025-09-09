@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import useAuthStore from "../auth/authStore";
-import { getRepair, updateRepair, updateRepairStatus, createCustomerUpdate, setWarranty } from "./repairsApi";
-import formatDate from "../../utils/formatDate";
-import DeliveryModal from "../../components/DeliveryModal";
-import StatusSelect from "../../components/StatusSelect";
+import {
+  getRepair,
+  updateRepair,
+  updateRepairStatus,
+  createCustomerUpdate,
+  setWarranty,
+} from "./repairsApi";
+import API, { RepairsAPI, DepartmentsAPI } from "../../lib/api";
 import QrAfterCreateModal from "../../components/QrAfterCreateModal";
+import DeliveryModal from "../../components/DeliveryModal";
 
 /* ========= Helpers ========= */
 function toNum(v) {
@@ -23,33 +28,56 @@ function priceDisplay(finalPrice, price) {
   return Number.isFinite(pn) ? pn : "—";
 }
 
+const STATUS_SELECT = ["مكتمل", "تم التسليم", "مرفوض"];
+
 const SHOP = {
   name: "IGenius",
   phone: "01000000000",
   address: "القاهرة — شارع المثال، عمارة 10",
   footer: "شكراً لاختياركم خدماتنا.",
-  // ملاحظات الضمان الافتراضية (عدّلها براحتك)
   warrantyNote:
     "الضمان يشمل العطل المُصلّح فقط ولا يشمل سوء الاستخدام أو الكسر أو السوائل.",
 };
 
 export default function SingleRepairPage() {
   const { id } = useParams();
-  const nav = useNavigate(); // قد تحتاجه لاحقًا
+  const nav = useNavigate();
   const { user } = useAuthStore();
-
-  const [qrOpen, setQrOpen] = useState(false);
-  const [warrantyEnd, setWarrantyEnd] = useState("");
-  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
 
   const isAdmin = user?.role === "admin" || user?.permissions?.adminOverride;
   const canEditAll = isAdmin || user?.permissions?.editRepair;
 
   const [loading, setLoading] = useState(true);
+  const [savingBtn, setSavingBtn] = useState(false);
+
   const [repair, setRepair] = useState(null);
 
-  // مودال ما بعد الإكمال/التسليم (لطباعة إيصال الضمان/واتساب)
+  const [qrOpen, setQrOpen] = useState(false);
+  const [deliverOpen, setDeliverOpen] = useState(false);
+  const [requirePassword, setRequirePassword] = useState(false);
+
   const [afterCompleteOpen, setAfterCompleteOpen] = useState(false);
+  const [warrantyEnd, setWarrantyEnd] = useState("");
+  const [showWarrantyModal, setShowWarrantyModal] = useState(false);
+
+  // التايملاين / الأقسام / الفنيين للخطوة الحالية
+  const [info, setInfo] = useState({
+    currentDepartment: null,
+    flows: [],
+    logs: [],
+    departmentPriceTotal: 0,
+    acl: {
+      canAssignTech: false,
+      canCompleteCurrent: false,
+      canMoveNext: false,
+    },
+  });
+  const [deps, setDeps] = useState([]);
+  const [techs, setTechs] = useState([]);
+  const [nextDept, setNextDept] = useState("");
+  const [assignTechId, setAssignTechId] = useState("");
+  const [stepPrice, setStepPrice] = useState("");
+  const [stepNotes, setStepNotes] = useState("");
 
   // إرسال تحديثات للعميل
   const [cuType, setCuType] = useState("text");
@@ -63,10 +91,6 @@ export default function SingleRepairPage() {
     return token ? `${window.location.origin}/t/${token}` : "";
   }, [repair]);
 
-  // مودال التسليم
-  const [deliverOpen, setDeliverOpen] = useState(false);
-  const [requirePassword, setRequirePassword] = useState(false);
-
   const isAssigned = useMemo(() => {
     if (!repair) return false;
     const techId = repair?.technician?._id || repair?.technician;
@@ -74,25 +98,17 @@ export default function SingleRepairPage() {
     return techId && uid && String(techId) === String(uid);
   }, [repair, user]);
 
-  useEffect(() => {
-    const h = () => load(); // إعادة التحميل عند حدث خارجي
-    window.addEventListener("repairs:refresh", h);
-    return () => window.removeEventListener("repairs:refresh", h);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function load() {
-    setLoading(true);
-    setError("");
+  async function loadRepairBase() {
     try {
+      setLoading(true);
       const r = await getRepair(id);
-      // توحيد أنواع الأرقام عند الاستلام
       const unified = {
         ...r,
         price: toNum(r.price) ?? r.price,
         finalPrice: toNum(r.finalPrice) ?? r.finalPrice,
       };
       setRepair(unified);
+      setError("");
     } catch (e) {
       setError(e?.response?.data?.message || "حدث خطأ أثناء التحميل");
     } finally {
@@ -100,28 +116,62 @@ export default function SingleRepairPage() {
     }
   }
 
+  async function loadTimeline() {
+    try {
+      const t = await RepairsAPI.timeline(id);
+      setInfo(t);
+      if (t?.currentDepartment?._id) {
+        const r = await API.get(
+          `/technicians?department=${t.currentDepartment._id}`
+        );
+        setTechs(r.data || []);
+      } else {
+        setTechs([]);
+      }
+    } catch (e) {
+      console.error(e);
+      setInfo({
+        currentDepartment: null,
+        flows: [],
+        logs: [],
+        departmentPriceTotal: 0,
+        acl: {
+          canAssignTech: false,
+          canCompleteCurrent: false,
+          canMoveNext: false,
+        },
+      });
+      setTechs([]);
+    }
+  }
+
   useEffect(() => {
-    load();
+    (async () => {
+      await loadRepairBase();
+      await loadTimeline();
+      const d = await DepartmentsAPI.list();
+      setDeps(d);
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  function onStatusChange(nextStatus) {
+  // تحديث عبر إيفنت خارجي (لو backend بث)
+  useEffect(() => {
+    const h = async () => {
+      await loadRepairBase();
+      await loadTimeline();
+    };
+    window.addEventListener("repairs:refresh", h);
+    return () => window.removeEventListener("repairs:refresh", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleStatusPick(nextStatus) {
     if (!repair) return;
 
     if (nextStatus === "تم التسليم") {
       setRequirePassword(!canEditAll && isAssigned);
       setDeliverOpen(true);
-      return;
-    }
-
-    if (nextStatus === "مرفوض") {
-      const body = { status: "مرفوض" };
-      if (!canEditAll && isAssigned) {
-        const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
-        if (!password) return;
-        body.password = password;
-      }
-      changeStatus(body);
       return;
     }
 
@@ -137,26 +187,26 @@ export default function SingleRepairPage() {
   async function changeStatus(body) {
     if (!repair) return;
     try {
+      setSavingBtn(true);
       const updated = await updateRepairStatus(id, body);
-      setRepair({
+      const norm = {
         ...updated,
         price: toNum(updated.price) ?? updated.price,
         finalPrice: toNum(updated.finalPrice) ?? updated.finalPrice,
-      });
+      };
+      setRepair(norm);
 
-      // ✅ منطق الضمان المطلوب:
       if (body?.status === "مكتمل" || body?.status === "تم التسليم") {
-        if (updated?.hasWarranty === true && !updated?.warrantyEnd) {
-          // لو عليه ضمان بدون تاريخ -> افتح اختيار التاريخ
+        if (norm?.hasWarranty === true && !norm?.warrantyEnd) {
           setShowWarrantyModal(true);
-        } else if (updated?.hasWarranty === true && updated?.warrantyEnd) {
-          // لو عليه ضمان ومعاه تاريخ -> افتح مودال الطباعة
+        } else if (norm?.hasWarranty === true && norm?.warrantyEnd) {
           setAfterCompleteOpen(true);
         }
-        // لو مفيش ضمان -> لا تُظهر أي شيء متعلق بالضمان
       }
     } catch (e) {
       alert(e?.response?.data?.message || "فشل تغيير الحالة");
+    } finally {
+      setSavingBtn(false);
     }
   }
 
@@ -164,7 +214,9 @@ export default function SingleRepairPage() {
     try {
       const body = { status: "مرفوض", rejectedDeviceLocation: loc };
       if (!canEditAll && isAssigned) {
-        const password = window.prompt("ادخل كلمة السر لتأكيد تغيير مكان الجهاز");
+        const password = window.prompt(
+          "ادخل كلمة السر لتأكيد تغيير مكان الجهاز"
+        );
         if (!password) return;
         body.password = password;
       }
@@ -186,50 +238,47 @@ export default function SingleRepairPage() {
         cost: p.cost ? Number(p.cost) : 0,
         supplier: p.supplier || undefined,
         source: p.source || undefined,
-        purchaseDate: p.purchaseDate ? new Date(p.purchaseDate).toISOString() : undefined,
+        purchaseDate: p.purchaseDate
+          ? new Date(p.purchaseDate).toISOString()
+          : undefined,
       }));
-
-      // السماح بتعديل السعرين من مودال التسليم لو موجودين
-      const fp = payload.finalPrice;
-      const p0 = payload.price; // يتطلب أن يكون لديك حقل السعر المبدئي في DeliveryModal (إن لم يوجد تجاهله)
-
       const body = {
         status: "تم التسليم",
-        ...(fp !== "" && fp != null ? { finalPrice: Number(fp) } : {}),
-        ...(p0 !== "" && p0 != null ? { price: Number(p0) } : {}),
         parts,
         ...(payload.password ? { password: payload.password } : {}),
+        ...(payload.finalPrice !== "" && payload.finalPrice != null
+          ? { finalPrice: Number(payload.finalPrice) }
+          : {}),
+        ...(payload.price !== "" && payload.price != null
+          ? { price: Number(payload.price) }
+          : {}),
       };
-
-      // مهم: استخدم updateRepair (مش updateRepairStatus)
       const updated = await updateRepair(id, body);
-
-      setRepair({
+      const norm = {
         ...updated,
         price: toNum(updated.price) ?? updated.price,
         finalPrice: toNum(updated.finalPrice) ?? updated.finalPrice,
-      });
+      };
+      setRepair(norm);
       setDeliverOpen(false);
 
-      // ✅ منطق الضمان المطلوب بعد إتمام التسليم
-      if (updated?.hasWarranty === true && !updated?.warrantyEnd) {
+      if (norm?.hasWarranty === true && !norm?.warrantyEnd) {
         setShowWarrantyModal(true);
-      } else if (updated?.hasWarranty === true && updated?.warrantyEnd) {
+      } else if (norm?.hasWarranty === true && norm?.warrantyEnd) {
         setAfterCompleteOpen(true);
       }
-      // لو مفيش ضمان -> لا تُظهر أي شيء متعلق بالضمان
     } catch (e) {
       alert(e?.response?.data?.message || "خطأ أثناء إتمام التسليم");
     }
   }
 
-  // طباعة إيصال الضمان
   function handlePrintReceipt() {
     if (!repair) return;
     const win = window.open("", "_blank", "width=800,height=900");
-    const warrantyTxt = repair?.hasWarranty && repair?.warrantyEnd
-      ? `ضمان حتى: ${formatDate(repair.warrantyEnd)}`
-      : "— لا يوجد تاريخ ضمان محدد —";
+    const warrantyTxt =
+      repair?.hasWarranty && repair?.warrantyEnd
+        ? `ضمان حتى: ${formatDate(repair.warrantyEnd)}`
+        : "— لا يوجد تاريخ ضمان محدد —";
 
     const html = `
 <!doctype html>
@@ -276,7 +325,10 @@ export default function SingleRepairPage() {
     <tr><th>النوع</th><td>${repair.deviceType || "—"}</td></tr>
     <tr><th>اللون</th><td>${repair.color || "—"}</td></tr>
     <tr><th>العطل</th><td>${repair.issue || "—"}</td></tr>
-    <tr><th>السعر النهائي</th><td>${priceDisplay(repair.finalPrice, repair.price)}</td></tr>
+    <tr><th>السعر النهائي</th><td>${priceDisplay(
+      repair.finalPrice,
+      repair.price
+    )}</td></tr>
     <tr><th>الضمان</th><td>${warrantyTxt}</td></tr>
   </table>
 
@@ -285,28 +337,22 @@ export default function SingleRepairPage() {
   </div>
   <div class="footer">${SHOP.footer}</div>
 
-  <script>
-    window.onload = () => window.print();
-  </script>
+  <script>window.onload = () => window.print();</script>
 </body>
-</html>
-    `;
-
+</html>`;
     win.document.open();
     win.document.write(html);
     win.document.close();
   }
 
-  // إنشاء رسالة واتساب وإرسالها
   function handleWhatsAppMessage() {
     if (!repair?.phone) {
       alert("لا يوجد رقم هاتف للعميل.");
       return;
     }
-    // تهيئة رقم مصر: إزالة أي رموز و أصفار بادئة
     const digits = String(repair.phone).replace(/\D+/g, "");
-    const normalized = digits.replace(/^0+/, ""); // شيل الأصفار في البداية
-    const phoneE164 = `20${normalized}`; // بدون + حسب wa.me
+    const normalized = digits.replace(/^0+/, "");
+    const phoneE164 = `20${normalized}`;
 
     const partsSummary = (repair.parts || [])
       .map((p) => {
@@ -323,7 +369,9 @@ export default function SingleRepairPage() {
 
     const msg = [
       `أهلاً ${repair.customerName || "عميلنا الكريم"} 👋`,
-      `يسعدنا إبلاغك أن جهازك (${repair.deviceType || "الجهاز"}) أصبح ${repair.status === "تم التسليم" ? "جاهزًا وتم تسليمه" : "جاهزًا"} ✅`,
+      `يسعدنا إبلاغك أن جهازك (${repair.deviceType || "الجهاز"}) أصبح ${
+        repair.status === "تم التسليم" ? "جاهزًا وتم تسليمه" : "جاهزًا"
+      } ✅`,
       `العطل: ${repair.issue || "—"}`,
       `السعر النهائي: ${priceDisplay(repair.finalPrice, repair.price)} جنيه`,
       `القطع المستخدمة:\n${partsSummary || "- لا توجد قطع"}`,
@@ -341,20 +389,25 @@ export default function SingleRepairPage() {
   }
 
   if (loading) return <div>جارِ التحميل...</div>;
-  if (error) return <div className="p-3 rounded-xl bg-red-50 text-red-800">{error}</div>;
+  if (error)
+    return <div className="p-3 rounded-xl bg-red-50 text-red-800">{error}</div>;
   if (!repair) return <div>الصيانة غير موجودة.</div>;
 
+  const cur = info.flows?.length ? info.flows[info.flows.length - 1] : null;
+  const isCurrentCompleted = cur && cur.status === "completed";
+
   return (
-    <div className={`space-y-6 ${repair?.hasWarranty || null ? "goldOne" : ""}`}>
+    <div
+      className={`space-y-6 ${repair?.hasWarranty || null ? "goldOne" : ""}`}
+    >
       <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">
-          صيانة #{repair.repairId ?? "—"}
-          {repair.hasWarranty && repair.warrantyEnd ? ` مع ضمان حتى ${formatDate(repair.warrantyEnd)}` : ""}
-        </h1>
+        <h1 className="text-xl font-bold">صيانة #{repair.repairId ?? "—"}</h1>
         <div className="flex items-center gap-2">
           <button
             onClick={() => {
-              if (!trackingUrl) {
+              const token = repair?.publicTracking?.token;
+              const url = token ? `${window.location.origin}/t/${token}` : "";
+              if (!url) {
                 alert("لم يتم تفعيل التتبّع بعد.");
                 return;
               }
@@ -365,7 +418,7 @@ export default function SingleRepairPage() {
             تتبُّع/QR
           </button>
 
-          {canEditAll && (
+          {(isAdmin || user?.permissions?.editRepair) && (
             <Link
               to={`/repairs/${id}/edit`}
               className="px-3 py-2 rounded-xl bg-blue-600 text-white"
@@ -382,66 +435,34 @@ export default function SingleRepairPage() {
         </div>
       </header>
 
+      {/* الحالة الرئيسية (مختصرة) */}
       <section className="p-3 rounded-xl bg-white dark:bg-gray-800">
-        <h2 className="font-semibold mb-2">التتبّع (QR)</h2>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 items-end">
-          <Info label="مرّات فتح رابط التتبّع" value={repair?.publicTracking?.views ?? 0} />
-          <Info
-            label="آخر فتح"
-            value={
-              repair?.publicTracking?.lastViewedAt
-                ? formatDate(repair.publicTracking.lastViewedAt)
-                : "—"
-            }
-          />
-          <div className="contents sm:flex items-center gap-2">
-            <button
-              onClick={() => {
-                const token = repair?.publicTracking?.token;
-                const url = token ? `${window.location.origin}/t/${token}` : "";
-                if (!url) return;
-                navigator.clipboard.writeText(url);
-              }}
-              className="px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700"
-            >
-              نسخ رابط التتبّع
-            </button>
-            <a
-              className="px-3 py-2 rounded-xl bg-blue-600 text-white"
-              href={
-                repair?.publicTracking?.token
-                  ? `${window.location.origin}/t/${repair.publicTracking.token}`
-                  : "#"
-              }
-              target="_blank"
-              rel="noreferrer"
-            >
-              فتح صفحة التتبّع
-            </a>
-          </div>
-        </div>
-      </section>
-
-      {/* الحالة + التواريخ */}
-      <section className="p-3 rounded-xl bg-white dark:bg-gray-800">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
-          <label className="space-y-1">
-            <div className="text-sm opacity-80">الحالة</div>
-            <StatusSelect
+        <div className="grid md:grid-cols-4 gap-3 items-end">
+          <div>
+            <div className="text-sm opacity-80 mb-1">الحالة</div>
+            <select
               value={repair.status || ""}
-              onChange={(v) => onStatusChange(v)}
+              onChange={(e) => handleStatusPick(e.target.value)}
               disabled={!canEditAll && !isAssigned}
-            />
+              className="px-3 py-2 rounded-xl border w-full"
+            >
+              <option value="">اختر حالة</option>
+              {STATUS_SELECT.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
             {!canEditAll && isAssigned && (
               <div className="text-xs opacity-70 mt-1">
                 عند اختيار “تم التسليم” سيُطلب كلمة السر.
               </div>
             )}
-
-            {/* خانة مكان الجهاز تظهر فقط عند الرفض */}
             {repair.status === "مرفوض" && (
               <div className="mt-2">
-                <div className="text-sm opacity-80 mb-1">مكان الجهاز عند الرفض</div>
+                <div className="text-sm opacity-80 mb-1">
+                  مكان الجهاز عند الرفض
+                </div>
                 <select
                   value={repair.rejectedDeviceLocation || "بالمحل"}
                   onChange={(e) => changeRejectedLocation(e.target.value)}
@@ -456,15 +477,184 @@ export default function SingleRepairPage() {
                 </div>
               </div>
             )}
-          </label>
+          </div>
 
+          <Info
+            label="القسم الحالي"
+            value={info.currentDepartment?.name || "—"}
+          />
           <Info label="تاريخ الإنشاء" value={formatDate(repair.createdAt)} />
-          <Info label="تاريخ الإستلام" value={formatDate(repair.deliveryDate)} />
           <Info label="الفني" value={repair?.technician?.name || "—"} />
         </div>
       </section>
 
-      {/* بيانات العميل والجهاز */}
+      {/* التايملاين */}
+      <div className="grid gap-3">
+        {(info.flows || []).length === 0 ? (
+          <div className="opacity-70">لا توجد خطوات بعد. عيّن قسمًا للبدء.</div>
+        ) : (
+          info.flows.map((f, i) => (
+            <div key={f._id} className="p-3 rounded-xl border">
+              <div className="flex flex-wrap items-center gap-2 justify-between">
+                <div className="font-semibold">
+                  {i + 1}. {f.department?.name || "قسم"}
+                </div>
+                <div className={`text-xs px-2 py-1 rounded-full border`}>
+                  {STATUS_AR[f.status] || f.status}
+                </div>
+              </div>
+              <div className="text-sm mt-1">
+                فنّي:{" "}
+                <b>
+                  {f.technician
+                    ? f.technician.name ||
+                      f.technician.username ||
+                      f.technician.email
+                    : "غير معيّن"}
+                </b>
+                {" · "}السعر: <b>{Number(f.price || 0).toFixed(2)}</b>
+              </div>
+              <div className="text-xs opacity-70 mt-1">
+                بدأ:{" "}
+                {f.startedAt ? new Date(f.startedAt).toLocaleString() : "-"} |
+                اكتمل:{" "}
+                {f.completedAt ? new Date(f.completedAt).toLocaleString() : "-"}
+              </div>
+              {f.notes && (
+                <div className="text-sm mt-1">ملاحظات: {f.notes}</div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* إجمالي تسعير الأقسام */}
+      <div className="p-3 rounded-xl border bg-gray-50 dark:bg-zinc-900">
+        إجمالي تسعير الأقسام:{" "}
+        <b>{Number(info.departmentPriceTotal || 0).toFixed(2)}</b>
+      </div>
+
+      {/* التحكم في الخطوة الحالية */}
+      <div className="grid gap-4 p-4 rounded-2xl border">
+        <h3 className="font-semibold">الخطوة الحالية</h3>
+        <div className="text-sm">
+          القسم الحالي: <b>{info.currentDepartment?.name || "-"}</b>
+        </div>
+
+        {/* تعيين فنّي */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={assignTechId}
+            onChange={(e) => setAssignTechId(e.target.value)}
+            disabled={!info.acl?.canAssignTech || !info.currentDepartment}
+          >
+            <option value="">— اختر فنّيًا —</option>
+            {techs.map((t) => (
+              <option key={t._id} value={t._id}>
+                {t.name || t.username || t.email}
+              </option>
+            ))}
+          </select>
+          <ActionButton
+            onClick={async () => {
+              if (!assignTechId) return;
+              try {
+                await RepairsAPI.assignTech(id, { technicianId: assignTechId });
+                setAssignTechId("");
+                await loadTimeline();
+              } catch (e) {
+                alert(e?.response?.data?.error || "غير مسموح بتعيين الفني");
+              }
+            }}
+            disabled={!info.acl?.canAssignTech}
+          >
+            تعيين الفنّي (أو بدء العمل)
+          </ActionButton>
+        </div>
+
+        {/* إكمال الخطوة الحالية + تسعيرها */}
+        <div className="flex flex-wrap items-end gap-2">
+          <div>
+            <label className="block text-sm mb-1">سعر القسم</label>
+            <input
+              type="number"
+              step="0.01"
+              className="border rounded-lg px-3 py-2"
+              value={stepPrice}
+              onChange={(e) => setStepPrice(e.target.value)}
+            />
+          </div>
+          <div className="grow">
+            <label className="block text-sm mb-1">ملاحظات (اختياري)</label>
+            <input
+              className="w-full border rounded-lg px-3 py-2"
+              value={stepNotes}
+              onChange={(e) => setStepNotes(e.target.value)}
+            />
+          </div>
+          <ActionButton
+            onClick={async () => {
+              try {
+                await RepairsAPI.completeStep(id, {
+                  price: Number(stepPrice || 0),
+                  notes: stepNotes,
+                });
+                setStepPrice("");
+                setStepNotes("");
+                await loadTimeline();
+              } catch (e) {
+                alert(e?.response?.data?.error || "غير مسموح بإكمال الخطوة");
+              }
+            }}
+            disabled={
+              !info.acl?.canCompleteCurrent ||
+              !cur ||
+              cur.status === "completed"
+            }
+          >
+            تعليم كمكتمل + حفظ السعر
+          </ActionButton>
+        </div>
+
+        {/* نقل للخطوة/القسم التالي */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            className="border rounded-lg px-3 py-2"
+            value={nextDept}
+            onChange={(e) => setNextDept(e.target.value)}
+          >
+            <option value="">— اختر القسم التالي —</option>
+            {deps.map((d) => (
+              <option key={d._id} value={d._id}>
+                {d.name}
+              </option>
+            ))}
+          </select>
+          <ActionButton
+            onClick={async () => {
+              if (!nextDept) return;
+              try {
+                await RepairsAPI.moveNext(id, { departmentId: nextDept });
+                setNextDept("");
+                await loadTimeline();
+              } catch (e) {
+                alert(
+                  e?.response?.data?.error || "غير مسموح بالنقل للخطوة التالية"
+                );
+              }
+            }}
+            disabled={
+              !info.acl?.canMoveNext ||
+              (!isCurrentCompleted && info.flows?.length > 0)
+            }
+          >
+            نقل الصيانة للقسم التالي
+          </ActionButton>
+        </div>
+      </div>
+
+      {/* بيانات أساسية */}
       <section className="p-3 rounded-xl bg-white dark:bg-gray-800 grid grid-cols-2 gap-3">
         <Info label="العميل" value={repair.customerName || "—"} />
         <Info label="الهاتف" value={repair.phone || "—"} />
@@ -532,7 +722,52 @@ export default function SingleRepairPage() {
         </div>
       </section>
 
-      {/* مودال الضمان: تحديد تاريخ الانتهاء */}
+      {/* السجل (بصياغة ودّية) */}
+      <section className="grid gap-2">
+        <h3 className="font-semibold">سجل الحركات</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-[680px] w-full text-sm">
+            <thead>
+              <tr className="border-b">
+                <th className="py-2 px-2">الوقت</th>
+                <th className="py-2 px-2">النوع</th>
+                <th className="py-2 px-2">التفاصيل</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(info.logs || []).length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-3 px-2 opacity-70">
+                    لا يوجد سجل.
+                  </td>
+                </tr>
+              ) : (
+                info.logs.map((lg, i) => (
+                  <LogRow key={i} log={lg} deps={deps} flows={info.flows} />
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <QrAfterCreateModal
+        open={qrOpen}
+        onClose={() => setQrOpen(false)}
+        trackingUrl={trackingUrl}
+        repair={repair}
+      />
+
+      <DeliveryModal
+        open={deliverOpen}
+        onClose={() => setDeliverOpen(false)}
+        onSubmit={submitDelivery}
+        initialFinalPrice={repair.finalPrice ?? repair.price ?? 0}
+        initialParts={repair.parts || []}
+        requirePassword={requirePassword}
+      />
+
+      {/* مودال اختيار تاريخ الضمان بعد مكتمل/تسليم */}
       {showWarrantyModal && (
         <div className="fixed inset-0 grid place-items-center bg-black/40 z-50">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl w-[380px] space-y-3">
@@ -546,31 +781,19 @@ export default function SingleRepairPage() {
             <div className="flex gap-2">
               <button
                 className="px-2 py-1 rounded-xl border"
-                onClick={() => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + 7);
-                  setWarrantyEnd(d.toISOString().slice(0, 10));
-                }}
+                onClick={() => setWarrantyEnd(addDays(7))}
               >
                 أسبوع
               </button>
               <button
                 className="px-2 py-1 rounded-xl border"
-                onClick={() => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + 30);
-                  setWarrantyEnd(d.toISOString().slice(0, 10));
-                }}
+                onClick={() => setWarrantyEnd(addDays(30))}
               >
                 شهر
               </button>
               <button
                 className="px-2 py-1 rounded-xl border"
-                onClick={() => {
-                  const d = new Date();
-                  d.setDate(d.getDate() + 90);
-                  setWarrantyEnd(d.toISOString().slice(0, 10));
-                }}
+                onClick={() => setWarrantyEnd(addDays(90))}
               >
                 3 شهور
               </button>
@@ -597,7 +820,6 @@ export default function SingleRepairPage() {
                     price: toNum(r.price) ?? r.price,
                     finalPrice: toNum(r.finalPrice) ?? r.finalPrice,
                   });
-                  // لو الحالة بالفعل مكتمل/تم التسليم بعد تحديد الضمان، افتح مودال الطباعة
                   if (["مكتمل", "تم التسليم"].includes(r?.status)) {
                     setAfterCompleteOpen(true);
                   }
@@ -610,86 +832,7 @@ export default function SingleRepairPage() {
         </div>
       )}
 
-      {/* قطع الغيار */}
-      <section className="p-3 rounded-xl bg-white dark:bg-gray-800">
-        <h2 className="font-semibold mb-2">قطع الغيار</h2>
-        {(repair.parts || []).length === 0 ? (
-          <div className="opacity-70">لا توجد قطع</div>
-        ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden sm:block overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-right">
-                    <th className="p-2">الاسم</th>
-                    <th className="p-2">بواسطة</th>
-                    <th className="p-2">المورد</th>
-                    <th className="p-2">تاريخ الشراء</th>
-                    <th className="p-2">التكلفة</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {repair.parts.map((p, i) => (
-                    <tr key={i} className="odd:bg-gray-50 dark:odd:bg-gray-700/40">
-                      <td className="p-2">{p.name || "—"}</td>
-                      <td className="p-2">{p.source || "—"}</td>
-                      <td className="p-2">{p.supplier || "—"}</td>
-                      <td className="p-2">{p.purchaseDate ? formatDate(p.purchaseDate) : "—"}</td>
-                      <td className="p-2">{numOrDash(p.cost)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {/* Mobile */}
-            <div className="space-y-2 sm:hidden">
-              {repair.parts.map((p, i) => (
-                <div key={i} className="p-3 rounded-lg bg-gray-100 dark:bg-gray-700">
-                  <div className="font-semibold mb-1">{p.name || "—"}</div>
-                  <div className="text-sm space-y-1">
-                    <div className="flex justify-between">
-                      <span className="opacity-70">بواسطة: </span>
-                      <span>{p.source || "—"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="opacity-70">المورد: </span>
-                      <span>{p.supplier || "—"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="opacity-70">تاريخ الشراء: </span>
-                      <span>{p.purchaseDate ? formatDate(p.purchaseDate) : "—"}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="opacity-70">التكلفة: </span>
-                      <span>{numOrDash(p.cost)}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
-      <QrAfterCreateModal
-        open={qrOpen}
-        onClose={() => setQrOpen(false)}
-        trackingUrl={trackingUrl}
-        repair={repair}
-      />
-
-      {/* مودال التسليم */}
-      <DeliveryModal
-        open={deliverOpen}
-        onClose={() => setDeliverOpen(false)}
-        onSubmit={submitDelivery}
-        initialFinalPrice={repair.finalPrice ?? repair.price ?? 0}
-        initialParts={repair.parts || []}
-        requirePassword={requirePassword}
-      />
-
-      {/* نفتح مودال ما بعد الإكمال فقط إن كان هناك ضمان بتاريخ */}
+      {/* مودال ما بعد الإكمال/التسليم */}
       {afterCompleteOpen && (
         <AfterCompleteModal
           open={afterCompleteOpen}
@@ -703,6 +846,26 @@ export default function SingleRepairPage() {
   );
 }
 
+function ActionButton({ children, onClick, disabled }) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      className="px-3 py-2 rounded-lg border disabled:opacity-50"
+      disabled={disabled || busy}
+      onClick={async () => {
+        try {
+          setBusy(true);
+          await onClick?.();
+        } finally {
+          setBusy(false);
+        }
+      }}
+    >
+      {busy ? "جارٍ التنفيذ..." : children}
+    </button>
+  );
+}
+
 function Info({ label, value, children }) {
   const v = value ?? children ?? "—";
   return (
@@ -713,442 +876,34 @@ function Info({ label, value, children }) {
   );
 }
 
-/* ======================= Activity Log (Responsive) ======================= */
-function ActivityLog({ logs = [] }) {
-  const ordered = [...logs].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  return (
-    <section className="mt-4 p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm">
-      <h2 className="font-semibold mb-3">سجلّ العمليات</h2>
-
-      {/* بطاقات للموبايل */}
-      <div className="md:hidden space-y-2">
-        {ordered.map((l) => (
-          <LogCard key={l._id} log={l} />
-        ))}
-      </div>
-
-      {/* جدول للديسكتوب/التابلت */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-right">
-              <Th>الوقت</Th>
-              <Th>المستخدم</Th>
-              <Th>الإجراء</Th>
-              <Th>التفاصيل</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {ordered.map((l) => (
-              <tr key={l._id} className="odd:bg-gray-50 dark:odd:bg-gray-700/40 align-top">
-                <Td>{formatDate(l.createdAt)}</Td>
-                <Td>{l?.changedBy?.name || "—"}</Td>
-                <Td>
-                  <ActionPill action={l.action} />
-                </Td>
-                <Td>
-                  {l.details && <div className="mb-2">{l.details}</div>}
-
-                  {Array.isArray(l.changes) && l.changes.length > 0 && (
-                    <ul className="pr-4 space-y-2">
-                      {l.changes.map((c, i) => {
-                        if (c.field === "parts") {
-                          return <PartsChange key={i} fromVal={c.from} toVal={c.to} />;
-                        }
-                        if (c.field === "partPaid") {
-                          return (
-                            <li key={i} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40">
-                              <span className="opacity-70">دفع قطعة غيار: </span>
-                              <span className="font-medium">{c?.to === true ? "تم الدفع" : "أُلغي الدفع"}</span>
-                            </li>
-                          );
-                        }
-                        return (
-                          <li key={i} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40">
-                            <span className="opacity-70">الحقل:</span>{" "}
-                            <span className="font-medium">{friendlyField(c.field)}</span>{" "}
-                            <span className="opacity-70">من</span>{" "}
-                            <code className="px-1 rounded bg-gray-100 dark:bg-gray-700">{renderVal(c.from)}</code>{" "}
-                            <span className="opacity-70">إلى</span>{" "}
-                            <code className="px-1 rounded bg-gray-100 dark:bg-gray-700">{renderVal(c.to)}</code>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </Td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </section>
-  );
-}
-
-/* ---------- مكونات مساعدة لسجلّ الموبايل ---------- */
-function ActionPill({ action }) {
-  const map = {
-    create: {
-      text: "إنشاء",
-      cls: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300",
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-          <path d="M11 11V5h2v6h6v2h-6v6h-2v-6H5v-2z" />
-        </svg>
-      ),
-    },
-    update: {
-      text: "تعديل",
-      cls: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300",
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0L14.13 4.1l3.75 3.75 2.83-2.81z" />
-        </svg>
-      ),
-    },
-    delete: {
-      text: "حذف",
-      cls: "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300",
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-          <path d="M6 7h12v2H6V7zm2 3h8l-1 9H9l-1-9zm3-6h2v2h-2V4z" />
-        </svg>
-      ),
-    },
-  };
-  const cfg = map[action] || {
-    text: action || "—",
-    cls: "bg-gray-100 text-gray-700 dark:bg-gray-700/40 dark:text-gray-200",
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-        <circle cx="12" cy="12" r="4" />
-      </svg>
-    ),
-  };
-
-  return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cfg.cls}`}>
-      {cfg.icon} {cfg.text}
-    </span>
-  );
-}
-
-function timeAgo(date) {
-  try {
-    const d = new Date(date).getTime();
-    const diff = Math.max(0, Date.now() - d);
-    const s = Math.floor(diff / 1000);
-    if (s < 60) return "منذ ثوانٍ";
-    const m = Math.floor(s / 60);
-    if (m < 60) return `منذ ${m} دقيقة`;
-    const h = Math.floor(m / 60);
-    if (h < 24) return `منذ ${h} ساعة`;
-    const dys = Math.floor(h / 24);
-    if (dys < 30) return `منذ ${dys} يوم`;
-    const mo = Math.floor(dys / 30);
-    if (mo < 12) return `منذ ${mo} شهر`;
-    const y = Math.floor(mo / 12);
-    return `منذ ${y} سنة`;
-  } catch {
-    return "";
-  }
-}
-
-function LogCard({ log }) {
-  const hasChanges = Array.isArray(log.changes) && log.changes.length > 0;
-
-  return (
-    <article className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 shadow-sm">
-      {/* رأس البطاقة */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="space-y-1">
-          <ActionPill action={log.action} />
-          <div className="text-sm">
-            <span className="opacity-70">المستخدم: </span>
-            <span className="font-medium">{log?.changedBy?.name || "—"}</span>
-          </div>
-        </div>
-        <div className="text-xs text-right leading-5">
-          <div className="opacity-70">{timeAgo(log.createdAt)}</div>
-          <div className="opacity-60">{formatDate(log.createdAt)}</div>
-        </div>
-      </div>
-
-      {/* التفاصيل العامة */}
-      {log.details && <div className="mt-2 text-sm">{log.details}</div>}
-
-      {/* تغييرات مفصّلة (قابلة للطيّ) */}
-      {hasChanges && (
-        <details className="mt-2 group">
-          <summary className="cursor-pointer select-none text-sm font-semibold flex items-center gap-1">
-            <svg viewBox="0 0 24 24" className="w-4 h-4" fill="currentColor">
-              <path d="M12 15.5 6 9.5h12z" />
-            </svg>
-            تفاصيل التغييرات
-            <span className="opacity-60 font-normal">({log.changes.length})</span>
-          </summary>
-          <ul className="mt-2 space-y-2 pr-2">
-            {log.changes.map((c, i) => {
-              if (c.field === "parts") {
-                return <PartsChange key={i} fromVal={c.from} toVal={c.to} />;
-              }
-              if (c.field === "partPaid") {
-                return (
-                  <li key={i} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40 text-sm">
-                    <span className="opacity-70">دفع قطعة غيار: </span>
-                    <span className="font-medium">{c?.to === true ? "تم الدفع" : "أُلغي الدفع"}</span>
-                  </li>
-                );
-              }
-              return (
-                <li key={i} className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40 text-sm">
-                  <div className="opacity-70">
-                    الحقل:{" "}
-                    <span className="font-medium opacity-100">{friendlyField(c.field)}</span>
-                  </div>
-                  <div className="mt-1">
-                    <span className="opacity-70">من</span>{" "}
-                    <code className="px-1 rounded bg-gray-100 dark:bg-gray-700">{renderVal(c.from)}</code>{" "}
-                    <span className="opacity-70">إلى</span>{" "}
-                    <code className="px-1 rounded bg-gray-100 dark:bg-gray-700">{renderVal(c.to)}</code>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        </details>
-      )}
-    </article>
-  );
-}
-
-function AfterCompleteModal({ open, onClose, onPrint, onWhatsApp, hasWarranty }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
-      <div className="bg-white dark:bg-gray-800 w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
-        <h3 className="text-lg font-semibold">تم إنهاء العملية</h3>
-        <p className="text-sm opacity-80">
-          {hasWarranty
-            ? "هل تودّ طباعة إيصال الضمان أو مراسلة العميل على واتساب؟"
-            : "هل تودّ مراسلة العميل على واتساب؟"}
-        </p>
-        <div className={`grid ${hasWarranty ? "sm:grid-cols-2" : "sm:grid-cols-1"} gap-2`}>
-          {hasWarranty && (
-            <button
-              className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
-              onClick={() => onPrint?.()}
-            >
-              طباعة إيصال الضمان
-            </button>
-          )}
-          <button
-            className="px-3 py-2 rounded-xl bg-green-600 text-white"
-            onClick={() => onWhatsApp?.()}
-          >
-            إرسال رسالة واتساب
-          </button>
-        </div>
-        <div className="flex justify-end">
-          <button className="px-3 py-2 rounded-xl border" onClick={onClose}>
-            إغلاق
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ====== عرض وديف لقطع الغيار بشكل مفهوم ====== */
-function PartsChange({ fromVal, toVal }) {
-  const oldParts = toArray(fromVal);
-  const newParts = toArray(toVal);
-
-  const diff = diffParts(oldParts, newParts);
-
-  if (diff.added.length === 0 && diff.removed.length === 0 && diff.updated.length === 0) {
-    return (
-      <li className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40">
-        لا تغييرات جوهرية على قطع الغيار
-      </li>
-    );
-  }
-
-  const F = FIELD_LABELS;
-
-  return (
-    <li className="p-2 rounded-lg bg-gray-50 dark:bg-gray-700/40 space-y-2">
-      <div className="font-semibold">تعديلات قطع الغيار:</div>
-
-      {diff.added.length > 0 && (
-        <div>
-          <div className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-            + تمت إضافة {diff.added.length} قطعة:
-          </div>
-          <ul className="list-disc pr-5 mt-1 space-y-1">
-            {diff.added.map((p, i) => (
-              <li key={`a-${i}`}>{prettyPart(p)}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {diff.removed.length > 0 && (
-        <div>
-          <div className="text-sm font-medium text-red-700 dark:text-red-300">
-            − تم حذف {diff.removed.length} قطعة:
-          </div>
-          <ul className="list-disc pr-5 mt-1 space-y-1">
-            {diff.removed.map((p, i) => (
-              <li key={`r-${i}`}>{prettyPart(p)}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {diff.updated.length > 0 && (
-        <div>
-          <div className="text-sm font-medium text-blue-700 dark:text-blue-300">
-            ✎ تم تعديل {diff.updated.length} قطعة:
-          </div>
-          <ul className="list-disc pr-5 mt-1 space-y-2">
-            {diff.updated.map((u, i) => (
-              <li key={`u-${i}`}>
-                <div className="font-medium">{u.newer.name || u.older.name || "قطعة بدون اسم"}</div>
-                <div className="mt-1 grid sm:grid-cols-2 gap-2">
-                  {u.changes.map((chg, j) => (
-                    <div
-                      key={`c-${j}`}
-                      className="rounded-lg bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 p-2"
-                    >
-                      <div className="text-xs opacity-70">{F[chg.field] || chg.field}</div>
-                      <div className="text-sm">
-                        <del className="opacity-70 mr-2">{simpleVal(chg.from, chg.field)}</del>
-                        <span className="mx-1">→</span>
-                        <strong>{simpleVal(chg.to, chg.field)}</strong>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </li>
-  );
-}
-
-/* ====== Helpers لقطع الغيار ====== */
-const FIELD_LABELS = {
-  name: "الاسم",
-  source: "بواسطة",
-  supplier: "المورد",
-  cost: "التكلفة",
-  purchaseDate: "تاريخ الشراء",
-  qty: "الكمية",
-  paid: "مدفوع؟",
+const STATUS_AR = {
+  waiting: "في الانتظار",
+  in_progress: "جاري العمل",
+  completed: "مكتمل",
 };
 
-function toArray(v) {
-  try {
-    if (!v) return [];
-    if (Array.isArray(v)) return v;
-    if (typeof v === "string") return JSON.parse(v);
-    return [];
-  } catch {
-    return [];
-  }
-}
+/* ==== سجلّ الحركات بصياغة ودّية ==== */
+const TYPE_AR = {
+  create: "إنشاء",
+  update: "تعديل",
+  status_change: "تغيير حالة",
+  assign_technician: "تعيين فنّي",
+  flow_complete: "اكتمال خطوة",
+  move_next: "نقل إلى قسم",
+  delete: "حذف",
+};
+const STATUS_AR_FULL = {
+  waiting: "في الانتظار",
+  in_progress: "جاري العمل",
+  completed: "مكتمل",
+  "في الانتظار": "في الانتظار",
+  "جاري العمل": "جاري العمل",
+  مكتمل: "مكتمل",
+  "تم التسليم": "تم التسليم",
+  مرفوض: "مرفوض",
+  مرتجع: "مرتجع",
+};
 
-function keyOf(p) {
-  if (p && p._id) return String(p._id);
-  const name = (p?.name || "").trim();
-  const date = p?.purchaseDate ? new Date(p.purchaseDate).toISOString().slice(0, 10) : "";
-  const cost = Number(p?.cost || 0);
-  const sup = (p?.supplier || "").trim();
-  const src = (p?.source || "").trim();
-  return `${name}|${date}|${cost}|${sup}|${src}`;
-}
-
-function normalizePart(p) {
-  return {
-    _id: p?._id,
-    name: p?.name || "",
-    source: p?.source || "",
-    supplier: p?.supplier || "",
-    cost: Number(p?.cost ?? 0),
-    purchaseDate: p?.purchaseDate || null,
-    qty: Number(p?.qty ?? 1),
-    paid: !!p?.paid,
-  };
-}
-
-function diffParts(oldArr, newArr) {
-  const oldMap = new Map(oldArr.map((x) => [keyOf(x), normalizePart(x)]));
-  const newMap = new Map(newArr.map((x) => [keyOf(x), normalizePart(x)]));
-
-  const added = [];
-  const removed = [];
-  const updated = [];
-
-  for (const [k, v] of newMap) {
-    if (!oldMap.has(k)) added.push(v);
-  }
-  for (const [k, v] of oldMap) {
-    if (!newMap.has(k)) removed.push(v);
-  }
-  for (const [k, newP] of newMap) {
-    if (!oldMap.has(k)) continue;
-    const oldP = oldMap.get(k);
-    const fields = ["name", "source", "supplier", "cost", "purchaseDate", "qty", "paid"];
-    const changes = [];
-    fields.forEach((f) => {
-      const a = oldP[f];
-      const b = newP[f];
-      const aStr = f === "purchaseDate" ? (a ? new Date(a).toISOString() : null) : a;
-      const bStr = f === "purchaseDate" ? (b ? new Date(b).toISOString() : null) : b;
-      if (JSON.stringify(aStr) !== JSON.stringify(bStr)) {
-        changes.push({ field: f, from: oldP[f], to: newP[f] });
-      }
-    });
-    if (changes.length) updated.push({ older: oldP, newer: newP, changes });
-  }
-
-  return { added, removed, updated };
-}
-
-function simpleVal(v, field) {
-  if (field === "purchaseDate") {
-    return v ? formatDate(v) : "—";
-  }
-  if (field === "cost") {
-    return Number.isFinite(Number(v)) ? Math.round(Number(v)) : v ?? "—";
-  }
-  if (field === "paid") {
-    return v ? "مدفوع" : "غير مدفوع";
-  }
-  if (field === "qty") {
-    return Number.isFinite(Number(v)) ? Number(v) : "—";
-  }
-  return v ?? "—";
-}
-
-function prettyPart(p) {
-  const bits = [];
-  if (p.name) bits.push(p.name);
-  if (p.supplier) bits.push(`المورد: ${p.supplier}`);
-  if (p.source) bits.push(`بواسطة: ${p.source}`);
-  if (Number.isFinite(Number(p.cost))) bits.push(`التكلفة: ${Math.round(Number(p.cost))}`);
-  if (p.purchaseDate) bits.push(`التاريخ: ${formatDate(p.purchaseDate)}`);
-  if (Number.isFinite(Number(p.qty))) bits.push(`الكمية: ${Number(p.qty)}`);
-  if (typeof p.paid === "boolean") bits.push(`الحالة: ${p.paid ? "مدفوع" : "غير مدفوع"}`);
-  return bits.join(" • ");
-}
-
-/* ====== دوال عامة ====== */
 function friendlyField(key = "") {
   const map = {
     status: "الحالة",
@@ -1162,18 +917,14 @@ function friendlyField(key = "") {
     returnDate: "تاريخ المرتجع",
     rejectedDeviceLocation: "مكان الجهاز (مرفوض)",
     parts: "قطع الغيار",
-    partPaid: "دفع قطعة غيار",
     notes: "ملاحظات",
     phone: "الهاتف",
     customerName: "اسم العميل",
   };
   return map[key] || key;
 }
-
 function renderVal(v) {
-  if (Array.isArray(v)) {
-    return `(${v.length} عنصر)`;
-  }
+  if (Array.isArray(v)) return `(${v.length} عنصر)`;
   if (v === null || v === undefined || v === "") return "—";
   if (typeof v === "boolean") return v ? "نعم" : "لا";
   if (typeof v === "number") return String(v);
@@ -1185,13 +936,131 @@ function renderVal(v) {
     return "—";
   }
 }
+function describeLog(log, { deps = [], flows = [] } = {}) {
+  const p = log?.payload || {};
+  const depById = new Map(deps.map((d) => [String(d._id), d]));
+  const flowById = new Map(flows.map((f) => [String(f._id), f]));
+  const out = { summary: "", details: [], partsChange: null };
 
-function Th({ children }) {
+  switch (log?.type) {
+    case "create":
+      out.summary = "تم إنشاء الصيانة";
+      break;
+
+    case "status_change": {
+      const st = STATUS_AR_FULL[p.status] || p.status || "—";
+      out.summary = `تم تغيير الحالة إلى «${st}»`;
+      break;
+    }
+
+    case "assign_technician": {
+      const f = p.flowId ? flowById.get(String(p.flowId)) : null;
+      const depName =
+        f?.department?.name ||
+        depById.get(String(f?.department))?.name ||
+        "قسم";
+      const techName =
+        f?.technician?.name ||
+        p.technicianName ||
+        (p.technicianId
+          ? `الفنّي (#${String(p.technicianId).slice(-4)})`
+          : "—");
+      out.summary = `تم تعيين «${techName}» على خطوة قسم «${depName}»`;
+      break;
+    }
+
+    case "flow_complete": {
+      const f = p.flowId ? flowById.get(String(p.flowId)) : null;
+      const depName =
+        f?.department?.name ||
+        depById.get(String(f?.department))?.name ||
+        "قسم";
+      out.summary = `اكتملت خطوة قسم «${depName}»`;
+      if (Number.isFinite(Number(p.price)))
+        out.details.push(`سعر القسم: ${Number(p.price).toFixed(2)} جنيه`);
+      if (p.notes) out.details.push(`ملاحظات: ${p.notes}`);
+      break;
+    }
+
+    case "move_next": {
+      const depName = depById.get(String(p.departmentId))?.name || "—";
+      out.summary = `تم نقل الصيانة إلى قسم «${depName}»`;
+      break;
+    }
+
+    case "update": {
+      out.summary = "تم تعديل البيانات";
+      const changes = Array.isArray(p.changes) ? p.changes : [];
+      for (const c of changes) {
+        if (c.field === "parts") {
+          out.partsChange = { fromVal: c.from, toVal: c.to };
+          continue;
+        }
+        const label = friendlyField(c.field);
+        const fromTxt = renderVal(c.from);
+        const toTxt = renderVal(c.to);
+        out.details.push(`${label}: من «${fromTxt}» إلى «${toTxt}»`);
+      }
+      break;
+    }
+
+    case "delete":
+      out.summary = "تم حذف الصيانة";
+      break;
+
+    default:
+      out.summary = TYPE_AR[log?.type] || log?.type || "—";
+      if (p && Object.keys(p).length) out.details.push(JSON.stringify(p));
+  }
+
+  return out;
+}
+function LogRow({ log, deps, flows }) {
+  const { summary, details, partsChange } = describeLog(log, { deps, flows });
+  const timeTxt = new Date(
+    log.at || log.createdAt || Date.now()
+  ).toLocaleString("ar-EG");
   return (
-    <th className="p-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b">{children}</th>
+    <tr className="border-b align-top">
+      <td className="py-2 px-2 whitespace-nowrap">{timeTxt}</td>
+      <td className="py-2 px-2 whitespace-nowrap">
+        {TYPE_AR[log.type] || log.type}
+      </td>
+      <td className="py-2 px-2">
+        <div>{summary}</div>
+        {Array.isArray(details) && details.length > 0 && (
+          <ul className="list-disc pr-5 mt-1 space-y-1">
+            {details.map((d, i) => (
+              <li key={i}>{d}</li>
+            ))}
+          </ul>
+        )}
+        {partsChange && typeof PartsChange === "function" && (
+          <div className="mt-2">
+            <PartsChange
+              fromVal={partsChange.fromVal}
+              toVal={partsChange.toVal}
+            />
+          </div>
+        )}
+      </td>
+    </tr>
   );
 }
 
-function Td({ children, className = "" }) {
-  return <td className={`p-2 align-top ${className}`}>{children}</td>;
+// PartsChange اختياري: لو عندك نفس المكوّن في المشروع هيشتغل تلقائيًا.
+// لو مش موجود، احذف جزء استدعاؤه داخل LogRow.
+
+function addDays(n) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+function formatDate(d) {
+  if (!d) return "—";
+  try {
+    return new Date(d).toLocaleString("ar-EG");
+  } catch {
+    return "—";
+  }
 }

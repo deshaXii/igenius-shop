@@ -105,6 +105,9 @@ export default function MainLayout() {
     { to: "/invoices", label: "الفواتير", icon: <IconInvoice /> },
     { to: "/accounts", label: "الحسابات", icon: <IconInvoice /> },
     { to: "/technicians", label: "الفنيون", icon: <IconUsers /> },
+    { to: "/inventory", label: "المخزن", icon: <IconUsers /> },
+    { to: "/suppliers", label: "الموردون", icon: <IconUsers /> },
+    { to: "/settings/departments", label: "الأقسام", icon: <IconUsers /> },
     { to: "/chat", label: "المراسلات", icon: <IconChat /> },
     {
       to: "/notifications",

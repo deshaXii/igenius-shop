@@ -8,10 +8,8 @@ import {
   setWarranty,
 } from "./repairsApi";
 import formatDate from "../../utils/formatDate";
-import statusOptions from "../../utils/statusOptions";
 import useAuthStore from "../auth/authStore";
 import DeliveryModal from "../../components/DeliveryModal";
-import StatusSelect from "../../components/StatusSelect";
 
 /* ========= Helpers ========= */
 function toNum(v) {
@@ -19,7 +17,6 @@ function toNum(v) {
   return Number.isFinite(n) ? n : null;
 }
 function includeNumberField(obj, key, val) {
-  // أضف الحقل الرقمي فقط لو ليه قيمة معتبرة (مش فاضي)
   if (val === "" || val === null || val === undefined) return obj;
   const n = Number(val);
   return Number.isFinite(n) ? { ...obj, [key]: n } : obj;
@@ -30,7 +27,9 @@ function hasNum(v) {
   return Number.isFinite(n);
 }
 
-// ======== NEW: بيانات المحل (بدّلها لو عندك Settings) ========
+const SHORT_STATUS = ["مكتمل", "تم التسليم", "مرفوض"];
+
+// ======== بيانات المحل ========
 const SHOP = {
   name: "IGenius",
   phone: "01000000000",
@@ -40,7 +39,7 @@ const SHOP = {
     "الضمان يشمل العطل المُصلّح فقط ولا يشمل سوء الاستخدام أو الكسر أو السوائل.",
 };
 
-// ======== NEW: هيلبرز مشتركة ========
+// ======== Helpers ========
 function getTrackingUrl(rep) {
   const token = rep?.publicTracking?.token;
   return token ? `${window.location.origin}/t/${token}` : "";
@@ -61,7 +60,6 @@ function isOldRepair(r, quick, startStr, endStr) {
   return deliveredIn && !createdIn;
 }
 
-// تاريخ محلي YYYY-MM-DD بدون UTC
 function ymdLocal(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -69,7 +67,7 @@ function ymdLocal(d) {
   return `${y}-${m}-${day}`;
 }
 
-// ======== NEW: طباعة إيصال الضمان لصيانة معيّنة ========
+// ======== طباعة إيصال الضمان ========
 function handlePrintReceipt(rep) {
   if (!rep) return;
   const win = window.open("", "_blank", "width=800,height=900");
@@ -147,15 +145,15 @@ function handlePrintReceipt(rep) {
   win.document.close();
 }
 
-// ======== NEW: رسالة واتساب لصيانة معيّنة (+20 مصر) ========
+// ======== رسالة واتساب ========
 function handleWhatsAppMessage(rep) {
   if (!rep?.phone) {
     alert("لا يوجد رقم هاتف للعميل.");
     return;
   }
   const digits = String(rep.phone).replace(/\D+/g, "");
-  const normalized = digits.replace(/^0+/, ""); // شيل أصفار البداية
-  const phoneE164 = `20${normalized}`; // +20 مصر
+  const normalized = digits.replace(/^0+/, "");
+  const phoneE164 = `20${normalized}`;
 
   const partsSummary = (rep.parts || [])
     .map(
@@ -203,7 +201,6 @@ function handleWhatsAppMessage(rep) {
 export default function RepairsPage() {
   const mobileRepairsFilter = useRef(null);
 
-  // ======== NEW: مودالات الضمان/الإجراءات ========
   const [afterCompleteOpen, setAfterCompleteOpen] = useState(false);
   const [afterCompleteTarget, setAfterCompleteTarget] = useState(null);
 
@@ -242,7 +239,7 @@ export default function RepairsPage() {
           next[idx] = data;
           return next;
         });
-      } catch (err) {
+      } catch {
         try {
           await load();
         } catch {}
@@ -292,6 +289,13 @@ export default function RepairsPage() {
   const [startDate, setStartDate] = useState(todayStr);
   const [endDate, setEndDate] = useState(todayStr);
   const [techs, setTechs] = useState([]);
+  const [deps, setDeps] = useState([]);
+  const depMap = useMemo(() => {
+    const m = new Map();
+    for (const d of deps) m.set(String(d._id), d.name);
+    return m;
+  }, [deps]);
+
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(false);
 
@@ -309,6 +313,10 @@ export default function RepairsPage() {
       try {
         const t = await API.get("/technicians").then((r) => r.data);
         setTechs(t);
+      } catch {}
+      try {
+        const d = await API.get("/departments").then((r) => r.data || []);
+        setDeps(d);
       } catch {}
     })();
   }, []);
@@ -379,7 +387,6 @@ export default function RepairsPage() {
           : undefined,
       }));
 
-      // دعم تعديل السعر النهائي + السعر المبدئي من مودال التسليم إن وُجد
       let body = {
         status: "تم التسليم",
         parts,
@@ -388,13 +395,11 @@ export default function RepairsPage() {
       body = includeNumberField(body, "finalPrice", payload.finalPrice);
       body = includeNumberField(body, "price", payload.price);
 
-      // مهم: استخدم updateRepair بدل updateRepairStatus
       const updated = await updateRepair(deliverTarget._id, body);
 
       setDeliverOpen(false);
       setDeliverTarget(null);
 
-      // منطق الضمان بعد التسليم
       if (updated?.hasWarranty === true && !updated?.warrantyEnd) {
         setWarrantyTarget(updated);
         setShowWarrantyModal(true);
@@ -411,13 +416,11 @@ export default function RepairsPage() {
 
   async function changeStatusInline(r, nextStatus) {
     try {
-      // تم التسليم: افتح مودال التسليم فقط، وخلّي التحديث يتم من هناك
       if (nextStatus === "تم التسليم") {
         openDeliverModal(r);
         return;
       }
 
-      // مرفوض: (نفس منطق الصلاحيات/كلمة السر)
       if (nextStatus === "مرفوض") {
         const body = { status: nextStatus };
         const isAssigned =
@@ -433,7 +436,6 @@ export default function RepairsPage() {
         return;
       }
 
-      // الحالات الأخرى (بما فيها "مكتمل")
       const body = { status: nextStatus };
       const isAssigned =
         r.technician &&
@@ -447,7 +449,6 @@ export default function RepairsPage() {
       const updated = await updateRepairStatus(r._id, body);
       await load();
 
-      // منطق الضمان عند التحويل إلى "مكتمل"
       if (nextStatus === "مكتمل") {
         if (updated?.hasWarranty === true && !updated?.warrantyEnd) {
           setWarrantyTarget(updated);
@@ -546,7 +547,7 @@ export default function RepairsPage() {
 
   const SkeletonRow = () => (
     <tr className="animate-pulse">
-      {Array.from({ length: 13 }).map((_, i) => (
+      {Array.from({ length: 12 }).map((_, i) => (
         <td key={i} className="p-2">
           <div className="h-3 rounded bg-gray-200 dark:bg-gray-700 w-full" />
         </td>
@@ -682,7 +683,7 @@ export default function RepairsPage() {
                   aria-label="تصفية بالحالة"
                 >
                   <option value="">كل الحالات</option>
-                  {statusOptions.map((s) => (
+                  {SHORT_STATUS.map((s) => (
                     <option key={s} value={s}>
                       {s}
                     </option>
@@ -731,11 +732,10 @@ export default function RepairsPage() {
               <Th>العطل</Th>
               <Th>اللون</Th>
               <Th>الفني</Th>
-              {/* <Th>المستلم</Th> */}
+              <Th>القسم الحالي</Th>
               <Th>الحالة</Th>
               <Th>السعر</Th>
               <Th>تاريخ الإنشاء</Th>
-              {/* <Th>تاريخ التسليم</Th> */}
               <Th>إجراءات</Th>
             </tr>
           </thead>
@@ -748,7 +748,7 @@ export default function RepairsPage() {
               </>
             ) : list.length === 0 ? (
               <tr>
-                <td colSpan={13} className="p-0">
+                <td colSpan={12} className="p-0">
                   <EmptyState />
                 </td>
               </tr>
@@ -759,6 +759,12 @@ export default function RepairsPage() {
                 const finalPrice = hasNum(r.finalPrice)
                   ? Number(r.finalPrice)
                   : null;
+
+                const depName =
+                  r.currentDepartment?.name ||
+                  depMap.get(String(r.currentDepartment || "")) ||
+                  "—";
+
                 return (
                   <tr
                     key={r._id}
@@ -768,7 +774,7 @@ export default function RepairsPage() {
                       old ? "ring-1 ring-yellow-200 dark:ring-yellow-700" : ""
                     }`}
                   >
-                    <Td className="">
+                    <Td>
                       <div className="flex items-center gap-2 whitespace-nowrap">
                         <span className="font-mono">#{r.repairId}</span>
                         {old && (
@@ -792,13 +798,26 @@ export default function RepairsPage() {
                     </Td>
                     <Td>{r.color || "—"}</Td>
                     <Td>{r?.technician?.name || "—"}</Td>
-                    {/* <Td>{r?.createdBy?.name || r?.recipient?.name || "—"}</Td> */}
+                    <Td>{depName}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
-                        <StatusSelect
-                          value={r.status}
-                          onChange={(next) => changeStatusInline(r, next)}
-                        />
+                        <select
+                          value={
+                            SHORT_STATUS.includes(r.status) ? r.status : ""
+                          }
+                          onChange={(e) =>
+                            changeStatusInline(r, e.target.value)
+                          }
+                          className="px-2 py-1 rounded-lg border w-[150px]"
+                        >
+                          <option value="">— اختر —</option>
+                          {SHORT_STATUS.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+
                         {r.status === "مرفوض" && (
                           <select
                             value={r.rejectedDeviceLocation || "بالمحل"}
@@ -815,12 +834,7 @@ export default function RepairsPage() {
                         )}
                       </div>
                     </Td>
-                    <Td>
-                      {finalPrice ?? basePrice ?? "—"}
-                      {/* {finalPrice !== null && basePrice !== null && finalPrice !== basePrice && (
-                        <div className="text-[11px] opacity-60">مبدئي: {basePrice}</div>
-                      )} */}
-                    </Td>
+                    <Td>{finalPrice ?? basePrice ?? "—"}</Td>
                     <Td>{formatDate(r.createdAt)}</Td>
                     <Td>
                       <div className="flex items-center gap-2">
@@ -846,6 +860,7 @@ export default function RepairsPage() {
                             aria-label={`حذف الصيانة رقم ${r.repairId}`}
                             title="حذف"
                           >
+                            {deletingId === r._id}{" "}
                             {deletingId === r._id ? "جارٍ…" : "حذف"}
                           </button>
                         )}
@@ -878,6 +893,12 @@ export default function RepairsPage() {
               finalPrice !== basePrice
                 ? ` (مبدئي: ${basePrice})`
                 : "";
+
+            const depName =
+              r.currentDepartment?.name ||
+              depMap.get(String(r.currentDepartment || "")) ||
+              "—";
+
             return (
               <div
                 key={r._id}
@@ -903,7 +924,7 @@ export default function RepairsPage() {
                   {r?.technician?.name
                     ? `الفني: ${r.technician.name}`
                     : "الفني: —"}{" "}
-                  • المسجّل: {r?.createdBy?.name || r?.recipient?.name || "—"}
+                  • القسم: {depName}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
@@ -918,11 +939,21 @@ export default function RepairsPage() {
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <div className="flex gap-2">
-                    <StatusSelect
-                      value={r.status}
-                      onChange={(next) => changeStatusInline(r, next)}
-                    />
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={SHORT_STATUS.includes(r.status) ? r.status : ""}
+                      onChange={(e) => changeStatusInline(r, e.target.value)}
+                      className="px-2 py-1 rounded-lg border"
+                    >
+                      <option value="" disabled>
+                        — اختر —
+                      </option>
+                      {SHORT_STATUS.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
                     {r.status === "مرفوض" && (
                       <select
                         value={r.rejectedDeviceLocation || "بالمحل"}
@@ -937,6 +968,7 @@ export default function RepairsPage() {
                       </select>
                     )}
                   </div>
+
                   <Link
                     to={`/repairs/${r._id}`}
                     className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
@@ -1051,7 +1083,6 @@ export default function RepairsPage() {
                   setShowWarrantyModal(false);
                   setWarrantyEnd("");
 
-                  // بعد تحديد الضمان، لو الحالة بالفعل مكتمل/تم التسليم افتح مودال الإجراءات
                   try {
                     const fresh = await API.get(
                       `/repairs/${warrantyTarget._id}`
@@ -1086,7 +1117,7 @@ export default function RepairsPage() {
   );
 }
 
-// ======== NEW: شارة الضمان (مُعاد استخدامها) ========
+// ======== شارة الضمان ========
 function WarrantyBadge({ until }) {
   return (
     <span
@@ -1106,7 +1137,7 @@ function WarrantyBadge({ until }) {
   );
 }
 
-// ======== NEW: AfterCompleteModal ========
+// ======== AfterCompleteModal ========
 function AfterCompleteModal({ open, onClose, onPrint, onWhatsApp }) {
   if (!open) return null;
   return (
