@@ -21,7 +21,7 @@ const LoginPage = () => {
     setError("");
     try {
       const { data } = await axios.post(
-        "https://igenius-shop-api-vercel.app/api/auth/login",
+        "https://igenius-shop-api.vercel.app/api/auth/login",
         { username, password }
       );
 
