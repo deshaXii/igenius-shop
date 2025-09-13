@@ -136,8 +136,6 @@ export default function QrAfterCreateModal({
     printViaIframe(html, "ملصق التتبّع");
   };
 
-  console.log(repair);
-
   return (
     <div className="fixed inset-0 z-50 bg-black/50 grid place-items-center p-4">
       <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-gray-800 p-5 space-y-4 shadow-xl">
@@ -166,6 +164,16 @@ export default function QrAfterCreateModal({
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-2 justify-end">
+          {/* 
+          <button
+            className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
+            onClick={handlePrintLabel}
+            disabled={!qrSrc}
+            title="طباعة ملصق الـ QR"
+          >
+            طباعة ملصق
+          </button> */}
+
           <button
             className="px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700"
             onClick={copyUrl}
@@ -184,16 +192,6 @@ export default function QrAfterCreateModal({
           >
             فتح الرابط
           </a>
-
-          <button
-            className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
-            onClick={handlePrintLabel}
-            disabled={!qrSrc}
-            title="طباعة ملصق الـ QR"
-          >
-            طباعة ملصق
-          </button>
-
           <button
             className="px-3 py-2 rounded-xl bg-blue-600 text-white"
             onClick={handlePrintReceipt}

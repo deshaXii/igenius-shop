@@ -8,6 +8,22 @@ const CATEGORIES = [
   { value: "accessory", label: "اكسسوار" },
 ];
 
+/** لوحة ألوان/ستايلات مختصرة */
+const UI = {
+  card: "bg-white/90 dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 rounded-2xl",
+  subtle: "bg-slate-50 dark:bg-slate-800/60",
+  btn: "px-3 py-2 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-indigo-500",
+  btnPrimary: "bg-indigo-600 hover:bg-indigo-700 text-white",
+  btnGhost:
+    "border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800",
+  badge: "px-2 py-0.5 text-xs rounded-full",
+  input: "px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 w-full",
+};
+
+function categoryLabel(v) {
+  return v === "part" ? "قطعة غيار" : v === "accessory" ? "اكسسوار" : "—";
+}
+
 /** أدوات مساعدة */
 function numOrEmpty(v) {
   if (v === 0) return 0;
@@ -34,12 +50,8 @@ export default function InventoryPage() {
     setLoading(true);
     setError("");
     try {
-      // ⬇️ عدّل لو مسارك مختلف
       const { data } = await API.get("/inventory", {
-        params: {
-          ...(q ? { q } : {}),
-          ...(category ? { category } : {}),
-        },
+        params: { ...(q ? { q } : {}), ...(category ? { category } : {}) },
       });
       setList(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -71,7 +83,6 @@ export default function InventoryPage() {
   async function doDelete() {
     if (!confirmTarget?._id) return;
     try {
-      // ⬇️ عدّل لو مسارك مختلف
       await API.delete(`/inventory/${confirmTarget._id}`);
       setList((prev) =>
         prev.filter((x) => String(x._id) !== String(confirmTarget._id))
@@ -85,151 +96,283 @@ export default function InventoryPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* رأس الصفحة */}
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">المخزن</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={load}
-            className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-          >
-            تحديث
-          </button>
-          <button
-            onClick={openCreate}
-            className="px-3 py-2 rounded-xl bg-blue-600 text-white hover:opacity-90"
-          >
-            + إضافة صنف
-          </button>
+    <div className="space-y-5">
+      {/* ===== رأس الصفحة (جريدينت خفيف) ===== */}
+      <div className="rounded-3xl overflow-hidden">
+        <div className="bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 text-white p-5 md:p-7">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">المخزن</h1>
+              <p className="opacity-90">
+                إدارة الأصناف، تتبّع الكميات، وتنبيه انخفاض المخزون.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={load}
+                className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}
+              >
+                تحديث
+              </button>
+              <button
+                onClick={openCreate}
+                className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}
+              >
+                + إضافة صنف
+              </button>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* الفلاتر */}
-      <section className="p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm space-y-2">
+      {/* ===== الفلاتر ===== */}
+      <section className={`${UI.card} p-3 md:p-4 space-y-3`}>
         <div className="grid md:grid-cols-3 gap-2">
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && load()}
-            placeholder="بحث باسم/كود/ملاحظة…"
-            className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
-          />
-          <select
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-            className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
-          >
-            <option value="">كل الأنواع</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.label}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => {
-              setQ("");
-              setCategory("");
-            }}
-            className="px-3 py-2 rounded-xl border"
-            disabled={!hasFilter}
-          >
-            مسح الفلاتر
-          </button>
+          <div className="relative">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && load()}
+              placeholder="بحث باسم/كود/ملاحظة…"
+              className={`${UI.input} pl-9`}
+            />
+            <svg
+              className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 opacity-60"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+            >
+              <path d="M21 21l-4.35-4.35m1.1-5.4a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z" />
+            </svg>
+          </div>
+
+          <div className="flex gap-2">
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className={`${UI.input}`}
+            >
+              <option value="">كل الأنواع</option>
+              {CATEGORIES.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setQ("");
+                setCategory("");
+              }}
+              className={`${UI.btn} ${UI.btnGhost} w-full md:w-auto`}
+              disabled={!hasFilter}
+            >
+              مسح الفلاتر
+            </button>
+          </div>
+        </div>
+
+        <div className="text-sm opacity-70">
+          النتائج: {loading ? "…" : list.length}
         </div>
       </section>
 
       {error && (
-        <div className="p-3 rounded-xl bg-red-50 text-red-800">{error}</div>
+        <div className="p-3 rounded-2xl bg-red-50 text-red-800">{error}</div>
       )}
 
-      {/* الجدول */}
-      <section className="p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm overflow-x-auto">
-        <div className="text-sm opacity-70 mb-2">
-          النتائج: {loading ? "…" : list.length}
-        </div>
-        <table className="w-full text-sm border-separate [border-spacing:0]">
-          <thead className="sticky top-0 bg-white dark:bg-gray-800 shadow-sm">
-            <tr className="text-right">
-              <Th>الاسم</Th>
-              <Th>النوع</Th>
-              <Th>الكود/الـSKU</Th>
-              <Th>سعر التكلفة</Th>
-              <Th>الكمية</Th>
-              <Th>أدنى كمية</Th>
-              <Th>المورد</Th>
-              <Th>ملاحظات</Th>
-              <Th>إجراءات</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
-            ) : list.length === 0 ? (
-              <tr>
-                <td colSpan={9} className="p-6 text-center opacity-70">
-                  لا توجد أصناف.
-                </td>
+      {/* ===== القائمة ===== */}
+      <section className={`${UI.card} p-0 overflow-hidden`}>
+        {/* Desktop Table */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full text-sm border-separate [border-spacing:0]">
+            <thead className="sticky top-0 bg-white/95 dark:bg-gray-900/95 shadow-sm">
+              <tr className="text-right">
+                <Th>الاسم</Th>
+                <Th>النوع</Th>
+                <Th>الكود/الـSKU</Th>
+                <Th>سعر التكلفة</Th>
+                <Th>الكمية</Th>
+                <Th>أدنى كمية</Th>
+                {/* <Th>المورد</Th> */}
+                <Th>ملاحظات</Th>
+                <Th>إجراءات</Th>
               </tr>
-            ) : (
-              list.map((it) => (
-                <tr
-                  key={it._id}
-                  className={`odd:bg-gray-50 dark:odd:bg-gray-700/40 ${
+            </thead>
+            <tbody>
+              {loading ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : list.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="p-6 text-center opacity-70">
+                    لا توجد أصناف.
+                  </td>
+                </tr>
+              ) : (
+                list.map((it) => {
+                  const low =
                     it.minStock != null &&
                     it.stock != null &&
-                    it.stock <= it.minStock
-                      ? "ring-1 ring-amber-300 dark:ring-amber-700"
-                      : ""
-                  }`}
+                    it.stock <= it.minStock;
+                  return (
+                    <tr
+                      key={it._id}
+                      className={`odd:bg-slate-50 dark:odd:bg-slate-800/50 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 transition ${
+                        low ? "ring-1 ring-amber-300 dark:ring-amber-700" : ""
+                      }`}
+                    >
+                      <Td className="font-medium">
+                        <div className="flex items-center gap-2">
+                          <span>{it.name}</span>
+                          {low && (
+                            <span
+                              className={`${UI.badge} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200`}
+                            >
+                              منخفض
+                            </span>
+                          )}
+                        </div>
+                      </Td>
+                      <Td>{categoryLabel(it.category)}</Td>
+                      <Td>{it.sku || "—"}</Td>
+                      <Td>
+                        {typeof it.unitCost === "number"
+                          ? Number(it.unitCost).toFixed(2)
+                          : "—"}
+                      </Td>
+                      <Td>{typeof it.stock === "number" ? it.stock : "—"}</Td>
+                      <Td>
+                        {typeof it.minStock === "number" ? it.minStock : "—"}
+                      </Td>
+                      {/* <Td>
+                        {it.supplier?.isShop
+                          ? "المحل"
+                          : it.supplier?.name || "—"}
+                      </Td> */}
+                      <Td
+                        className="max-w-[260px] truncate"
+                        title={it.notes || ""}
+                      >
+                        {it.notes || "—"}
+                      </Td>
+                      <Td>
+                        <div className="flex items-center gap-2">
+                          <button
+                            className={`${UI.btn} ${UI.btnGhost}`}
+                            onClick={() => openEdit(it)}
+                          >
+                            تعديل
+                          </button>
+                          <button
+                            className={`${UI.btn} bg-rose-600 hover:bg-rose-700 text-white`}
+                            onClick={() => askDelete(it)}
+                          >
+                            حذف
+                          </button>
+                        </div>
+                      </Td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Mobile Cards */}
+        <div className="md:hidden p-3 grid gap-3">
+          {loading ? (
+            <>
+              <CardSkeleton />
+              <CardSkeleton />
+            </>
+          ) : list.length === 0 ? (
+            <div className="opacity-70 text-center py-6">لا توجد أصناف.</div>
+          ) : (
+            list.map((it) => {
+              const low =
+                it.minStock != null &&
+                it.stock != null &&
+                it.stock <= it.minStock;
+              return (
+                <div
+                  key={it._id}
+                  className={`p-4 ${UI.subtle} rounded-2xl border dark:border-slate-700`}
                 >
-                  <Td className="font-medium">{it.name}</Td>
-                  <Td>
-                    {it.category === "part"
-                      ? "قطعة غيار"
-                      : it.category === "accessory"
-                      ? "اكسسوار"
-                      : "—"}
-                  </Td>
-                  <Td>{it.sku || "—"}</Td>
-                  <Td>
-                    {typeof it.unitCost === "number"
-                      ? Number(it.unitCost).toFixed(2)
-                      : "—"}
-                  </Td>
-                  <Td>{typeof it.stock === "number" ? it.stock : "—"}</Td>
-                  <Td>{typeof it.minStock === "number" ? it.minStock : "—"}</Td>
-                  <Td>
-                    {it.supplier?.isShop ? "المحل" : it.supplier?.name || "—"}
-                  </Td>
-                  <Td className="max-w-[240px] truncate" title={it.notes || ""}>
-                    {it.notes || "—"}
-                  </Td>
-                  <Td>
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="px-2 py-1 rounded-lg bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
-                        onClick={() => openEdit(it)}
-                      >
-                        تعديل
-                      </button>
-                      <button
-                        className="px-2 py-1 rounded-lg bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200"
-                        onClick={() => askDelete(it)}
-                      >
-                        حذف
-                      </button>
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="font-semibold text-base">{it.name}</div>
+                      <div className="text-xs opacity-70 mt-0.5">
+                        {categoryLabel(it.category)}
+                      </div>
                     </div>
-                  </Td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                    {low && (
+                      <span
+                        className={`${UI.badge} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200`}
+                      >
+                        مخزون منخفض
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
+                    <InfoRow k="SKU" v={it.sku || "—"} />
+                    <InfoRow
+                      k="سعر التكلفة"
+                      v={
+                        typeof it.unitCost === "number"
+                          ? Number(it.unitCost).toFixed(2)
+                          : "—"
+                      }
+                    />
+                    <InfoRow
+                      k="الكمية"
+                      v={typeof it.stock === "number" ? it.stock : "—"}
+                    />
+                    <InfoRow
+                      k="أدنى كمية"
+                      v={typeof it.minStock === "number" ? it.minStock : "—"}
+                    />
+                    <InfoRow
+                      k="المورد"
+                      v={
+                        it.supplier?.isShop ? "المحل" : it.supplier?.name || "—"
+                      }
+                      className="col-span-2"
+                    />
+                    {it.notes && (
+                      <InfoRow
+                        k="ملاحظات"
+                        v={it.notes}
+                        className="col-span-2"
+                      />
+                    )}
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      className={`${UI.btn} ${UI.btnGhost}`}
+                      onClick={() => openEdit(it)}
+                    >
+                      تعديل
+                    </button>
+                    <button
+                      className={`${UI.btn} ${UI.btnPrimary}`}
+                      onClick={() => askDelete(it)}
+                    >
+                      حذف
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </section>
 
       {/* مودال إنشاء/تعديل الصنف */}
@@ -240,7 +383,6 @@ export default function InventoryPage() {
         onSaved={(saved) => {
           setModalOpen(false);
           setEditTarget(null);
-          // تحديث القائمة محليًا بدون ريلود كامل
           setList((prev) => {
             const idx = prev.findIndex(
               (x) => String(x._id) === String(saved._id)
@@ -267,7 +409,7 @@ export default function InventoryPage() {
           setConfirmTarget(null);
         }}
         onConfirm={doDelete}
-        confirmClass="bg-red-600 text-white"
+        confirmClass="bg-rose-600 hover:bg-rose-700 text-white"
         confirmText="حذف"
       />
     </div>
@@ -278,23 +420,45 @@ export default function InventoryPage() {
 
 function Th({ children }) {
   return (
-    <th className="p-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+    <th className="p-3 text-xs font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
       {children}
     </th>
   );
 }
 function Td({ children, className = "" }) {
-  return <td className={`p-2 align-top ${className}`}>{children}</td>;
+  return <td className={`p-3 align-top ${className}`}>{children}</td>;
 }
 function SkeletonRow() {
   return (
     <tr className="animate-pulse">
       {Array.from({ length: 9 }).map((_, i) => (
-        <td key={i} className="p-2">
-          <div className="h-3 rounded bg-gray-200 dark:bg-gray-700 w-full" />
+        <td key={i} className="p-3">
+          <div className="h-3 rounded bg-slate-200 dark:bg-slate-700 w-full" />
         </td>
       ))}
     </tr>
+  );
+}
+function CardSkeleton() {
+  return (
+    <div
+      className={`p-4 ${UI.subtle} rounded-2xl border dark:border-slate-700 animate-pulse`}
+    >
+      <div className="h-4 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
+      <div className="grid grid-cols-2 gap-2 mt-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-3 bg-slate-200 dark:bg-slate-700 rounded" />
+        ))}
+      </div>
+    </div>
+  );
+}
+function InfoRow({ k, v, className = "" }) {
+  return (
+    <div className={`text-sm ${className}`}>
+      <div className="text-[11px] opacity-60">{k}</div>
+      <div className="font-medium break-words">{v}</div>
+    </div>
   );
 }
 
@@ -356,7 +520,6 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
 
     try {
       setSaving(true);
-      // ⬇️ عدّل لو مسارك مختلف
       const { data } = isEdit
         ? await API.put(`/inventory/${initial._id}`, payload)
         : await API.post("/inventory/", payload);
@@ -374,16 +537,16 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
       <form
         onSubmit={submit}
-        className="bg-white dark:bg-gray-800 w-[520px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl"
+        className={`${UI.card} w-[560px] max-w-[92vw] overflow-y-auto h-[86vh] md:h-auto p-4 md:p-5 shadow-xl`}
       >
         <h3 className="text-lg font-semibold">
           {isEdit ? "تعديل صنف" : "إضافة صنف"}
         </h3>
 
-        <div className="grid md:grid-cols-2 gap-3">
+        <div className="mt-3 grid md:grid-cols-2 gap-3">
           <Field label="الاسم *">
             <input
-              className="inp w-full"
+              className={UI.input}
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
@@ -392,7 +555,7 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
 
           <Field label="النوع *">
             <select
-              className="inp w-full"
+              className={UI.input}
               value={category}
               onChange={(e) => setCategory(e.target.value)}
               required
@@ -408,7 +571,7 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
 
           <Field label="الكود / SKU">
             <input
-              className="inp w-full"
+              className={UI.input}
               value={sku}
               onChange={(e) => setSku(e.target.value)}
               placeholder="اختياري"
@@ -418,7 +581,7 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
           <Field label="سعر التكلفة">
             <input
               type="number"
-              className="inp w-full"
+              className={UI.input}
               value={unitCost}
               onChange={(e) => setUnitCost(e.target.value)}
               placeholder="0"
@@ -429,7 +592,7 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
           <Field label="الكمية">
             <input
               type="number"
-              className="inp w-full"
+              className={UI.input}
               value={stock}
               onChange={(e) => setStock(e.target.value)}
               placeholder="0"
@@ -439,23 +602,23 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
           <Field label="أدنى كمية">
             <input
               type="number"
-              className="inp w-full"
+              className={UI.input}
               value={minStock}
               onChange={(e) => setMinStock(e.target.value)}
               placeholder="0"
             />
           </Field>
 
-          {/* <Field label="المورد">
+          <Field label="المورد (اختياري)">
             <SupplierSelect
               value={supplierId}
               onChange={(id) => setSupplierId(id)}
             />
-          </Field> */}
+          </Field>
 
           <Field label="ملاحظات">
             <input
-              className="inp w-full"
+              className={UI.input}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="اختياري"
@@ -463,10 +626,10 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
           </Field>
         </div>
 
-        <div className="flex items-center justify-end gap-2">
+        <div className="mt-4 flex items-center justify-end gap-2">
           <button
             type="button"
-            className="px-3 py-2 rounded-xl border"
+            className={`${UI.btn} ${UI.btnGhost}`}
             onClick={onClose}
           >
             إلغاء
@@ -474,13 +637,11 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
           <button
             type="submit"
             disabled={saving}
-            className="px-3 py-2 rounded-xl bg-blue-600 text-white disabled:opacity-50"
+            className={`${UI.btn} ${UI.btnPrimary} disabled:opacity-50`}
           >
             {saving ? "جارٍ الحفظ…" : "حفظ"}
           </button>
         </div>
-
-        <style>{`.inp{padding:.5rem .75rem;border-radius:.75rem;background:#f3f4f6}`}</style>
       </form>
     </div>
   );
@@ -493,24 +654,21 @@ function ConfirmDialog({
   message = "هل أنت متأكد؟",
   cancelText = "إلغاء",
   confirmText = "تأكيد",
-  confirmClass = "bg-blue-600 text-white",
+  confirmClass = "bg-indigo-600 text-white",
   onCancel,
   onConfirm,
 }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-black/40">
-      <div className="bg-white dark:bg-gray-800 w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
+      <div className={`${UI.card} w-[420px] max-w-[92vw] p-4 md:p-5 shadow-xl`}>
         <h3 className="text-lg font-semibold">{title}</h3>
-        <p className="opacity-80">{message}</p>
-        <div className="flex items-center justify-end gap-2">
-          <button className="px-3 py-2 rounded-xl border" onClick={onCancel}>
+        <p className="opacity-80 mt-1">{message}</p>
+        <div className="mt-4 flex items-center justify-end gap-2">
+          <button className={`${UI.btn} ${UI.btnGhost}`} onClick={onCancel}>
             {cancelText}
           </button>
-          <button
-            className={`px-3 py-2 rounded-xl ${confirmClass}`}
-            onClick={onConfirm}
-          >
+          <button className={`${UI.btn} ${confirmClass}`} onClick={onConfirm}>
             {confirmText}
           </button>
         </div>

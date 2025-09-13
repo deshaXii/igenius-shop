@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../lib/api";
 import {
@@ -27,6 +27,17 @@ function hasNum(v) {
   return Number.isFinite(n);
 }
 
+/* UI Presets */
+const UI = {
+  card: "bg-white/90 dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 rounded-2xl",
+  input: "px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 w-full",
+  btn: "px-3 py-2 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-indigo-500",
+  btnPrimary: "bg-indigo-600 hover:bg-indigo-700 text-white",
+  btnGhost:
+    "border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800",
+  pill: "px-2 py-0.5 rounded-full text-xs font-medium",
+};
+
 const SHORT_STATUS = ["مكتمل", "تم التسليم", "مرفوض"];
 
 // ======== بيانات المحل ========
@@ -44,7 +55,6 @@ function getTrackingUrl(rep) {
   const token = rep?.publicTracking?.token;
   return token ? `${window.location.origin}/t/${token}` : "";
 }
-
 function inRange(dateISO, startStr, endStr) {
   if (!dateISO || !startStr || !endStr) return false;
   const d = new Date(dateISO);
@@ -52,14 +62,12 @@ function inRange(dateISO, startStr, endStr) {
   const end = new Date(`${endStr}T23:59:59.999`);
   return d >= start && d <= end;
 }
-
 function isOldRepair(r, quick, startStr, endStr) {
   if (quick === "all" || !startStr || !endStr) return false;
   const deliveredIn = inRange(r.deliveryDate, startStr, endStr);
   const createdIn = inRange(r.createdAt, startStr, endStr);
   return deliveredIn && !createdIn;
 }
-
 function ymdLocal(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -199,7 +207,8 @@ function handleWhatsAppMessage(rep) {
 }
 
 export default function RepairsPage() {
-  const mobileRepairsFilter = useRef(null);
+  /* Bottom Sheet state بدلاً من DOM refs */
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [afterCompleteOpen, setAfterCompleteOpen] = useState(false);
   const [afterCompleteTarget, setAfterCompleteTarget] = useState(null);
@@ -207,16 +216,6 @@ export default function RepairsPage() {
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
   const [warrantyEnd, setWarrantyEnd] = useState("");
   const [warrantyTarget, setWarrantyTarget] = useState(null);
-
-  function showMobileFilter(e) {
-    e.target.style.transition = "bottom 0.3s linear;";
-    mobileRepairsFilter.current.classList.toggle("show");
-    if (mobileRepairsFilter.current.classList.contains("show")) {
-      e.target.style.bottom = "330px";
-    } else {
-      e.target.style.bottom = "12px";
-    }
-  }
 
   useEffect(() => {
     const h = () => load();
@@ -255,7 +254,7 @@ export default function RepairsPage() {
     if (!user) {
       navigation(0);
     }
-  }, [user]);
+  }, [user, navigation]);
 
   const isAdmin = user?.role === "admin" || user?.permissions?.adminOverride;
   const canViewAll =
@@ -504,15 +503,30 @@ export default function RepairsPage() {
     }
   }
 
+  /* ====== إحصاءات سريعة حسب الفلتر الحالي ====== */
+  const kpis = useMemo(() => {
+    const total = list.length;
+    let completed = 0,
+      delivered = 0,
+      rejected = 0,
+      warranty = 0;
+    for (const r of list) {
+      if (r.status === "مكتمل") completed++;
+      if (r.status === "تم التسليم") delivered++;
+      if (r.status === "مرفوض") rejected++;
+      if (r.hasWarranty) warranty++;
+    }
+    return { total, completed, delivered, rejected, warranty };
+  }, [list]);
+
   /* ====== UI Components ====== */
   const QuickBtn = ({ label, icon, active, onClick }) => (
     <button
       onClick={onClick}
-      className={`flex items-center gap-2 px-3 py-2 rounded-xl border transition
-      ${
+      className={`flex items-center justify-center gap-2 ${UI.btn} ${
         active
-          ? "bg-blue-600 text-white border-blue-600"
-          : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+          ? "bg-indigo-600 text-white"
+          : `${UI.btnGhost} bg-white dark:bg-gray-900`
       }`}
       aria-pressed={active}
     >
@@ -523,50 +537,41 @@ export default function RepairsPage() {
 
   const StatusPill = ({ s }) => {
     const map = {
-      "في الانتظار": "bg-gray-100 text-gray-800 dark:bg-gray-700",
+      "في الانتظار": "bg-slate-100 text-slate-800 dark:bg-slate-700",
       "جاري العمل":
         "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
       مكتمل:
         "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200",
       "تم التسليم":
         "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200",
-      مرفوض: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200",
+      مرفوض: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
       مرتجع:
         "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200",
     };
     return (
-      <span
-        className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-          map[s] || "bg-gray-100 dark:bg-gray-700"
-        }`}
-      >
-        {s}
-      </span>
+      <span className={`${UI.pill} ${map[s] || "bg-slate-100"}`}>{s}</span>
     );
   };
 
   const SkeletonRow = () => (
     <tr className="animate-pulse">
       {Array.from({ length: 12 }).map((_, i) => (
-        <td key={i} className="p-2">
-          <div className="h-3 rounded bg-gray-200 dark:bg-gray-700 w-full" />
+        <td key={i} className="p-3">
+          <div className="h-3 rounded bg-slate-200 dark:bg-slate-700 w-full" />
         </td>
       ))}
     </tr>
   );
 
   const EmptyState = () => (
-    <div className="p-6 rounded-2xl bg-white dark:bg-gray-800 text-center">
+    <div className={`${UI.card} p-6 text-center`}>
       <div className="text-3xl mb-2">🔍</div>
       <div className="font-semibold mb-1">لا توجد نتائج لهذا الفلتر</div>
       <div className="opacity-70 mb-3 text-sm">
         جرّب توسيع المدى الزمني أو إزالة بعض الفلاتر.
       </div>
       {canAddRepair && (
-        <Link
-          to="/repairs/new"
-          className="inline-block px-4 py-2 rounded-xl bg-blue-600 text-white"
-        >
+        <Link to="/repairs/new" className={`${UI.btn} ${UI.btnPrimary}`}>
           + إضافة صيانة
         </Link>
       )}
@@ -574,43 +579,82 @@ export default function RepairsPage() {
   );
 
   return (
-    <div className="space-y-4">
-      {/* رأس الصفحة */}
-      <header className="flex items-center justify-between  bg-gradient-to-b from-white/80 to-white/0 dark:from-gray-900/80 backdrop-blur py-2">
-        <h1 className="text-xl font-bold">الصيانات</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={load}
-            className="px-3 py-2 rounded-xl border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
-          >
-            تحديث
-          </button>
-          {canAddRepair && (
-            <Link
-              to="/repairs/new"
-              className="px-3 py-2 rounded-xl bg-blue-600 text-white hover:opacity-90"
-            >
-              + إضافة صيانة
-            </Link>
-          )}
+    <div className="space-y-5">
+      {/* ===== هيدر جذاب ===== */}
+      <div className="rounded-3xl overflow-hidden">
+        <div className="bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 text-white p-5 md:p-7">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">الصيانات</h1>
+              <p className="opacity-90">عرض وتتبع الحالات مع فلاتر مرنة.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={load}
+                className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}
+              >
+                تحديث
+              </button>
+              {canAddRepair && (
+                <Link
+                  to="/repairs/new"
+                  className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}
+                >
+                  + إضافة صيانة
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* الفلاتر */}
+      {/* ===== KPI Cards ===== */}
+      <section className="grid grid-cols-2 mb-2 md:grid-cols-5 gap-2">
+        <KPI title="الإجمالي" value={kpis.total} />
+        <KPI title="مكتمل" value={kpis.completed} tone="emerald" />
+        <KPI title="تم التسليم" value={kpis.delivered} tone="indigo" />
+        <KPI title="مرفوض" value={kpis.rejected} tone="rose" />
+        <KPI title="بضمان" value={kpis.warranty} tone="amber" />
+      </section>
+
+      {/* ===== الفلاتر ===== */}
       {canUseRepairFilters && (
         <>
+          {/* زر عائم للموبايل */}
           <button
-            onClick={showMobileFilter}
-            className="btn show-mobile-repairs-filter-btn fixed bottom-[12px] left-[50%] -translate-x-1/2 z-10 px-4 py-2 w-64 rounded-[15px] bg-blue-600 text-white shadow-lg md:hidden"
+            onClick={() => setFiltersOpen((v) => !v)}
+            className="fixed md:hidden bottom-3 left-1/2 -translate-x-1/2 z-40 w-64 px-4 py-2 rounded-2xl bg-indigo-600 text-white shadow-lg"
           >
-            بحث 🔍
+            {filtersOpen ? "إغلاق البحث" : "بحث 🔍"}
           </button>
+
+          {/* Scrim للموبايل */}
+          {filtersOpen && (
+            <div
+              className="fixed inset-0 bg-black/40 z-30 md:hidden"
+              onClick={() => setFiltersOpen(false)}
+            />
+          )}
+
+          {/* Bottom Sheet (Mobile) + Static (Desktop) */}
           <section
-            ref={mobileRepairsFilter}
-            className="fixed bottom-[12px] left-[12px] mobile-repairs-filters md:static p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm space-y-3"
+            className={`repairs-filters
+              ${UI.card} shadow-sm p-3 md:p-4 space-y-3
+              md:static md:translate-y-0
+              fixed md:relative left-0 right-0 z-40 md:z-auto
+              md:rounded-2xl rounded-t-3xl
+              md:mx-0 mx-0
+              md:bottom-auto bottom-0
+              transition-transform duration-300
+              ${
+                filtersOpen
+                  ? "translate-y-0"
+                  : "translate-y-full md:translate-y-0"
+              }
+            `}
           >
-            <div className="sm:grid-cols-1 sm:flex sm:flex-wrap grid grid-cols-2  gap-2">
-              <div className="flex gap-2  all-full-width">
+            <div className="grid sm:flex sm:flex-wrap gap-2">
+              <div className="flex gap-2 grow">
                 <QuickBtn
                   label="اليوم"
                   icon="📅"
@@ -631,7 +675,7 @@ export default function RepairsPage() {
                 />
               </div>
               <div className="hidden sm:block opacity-60 self-center">أو</div>
-              <div className="col-span-2 sm:flex sm:items-center sm:gap-2 date-filter">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                 <input
                   type="date"
                   value={startDate}
@@ -639,7 +683,7 @@ export default function RepairsPage() {
                     setStartDate(e.target.value);
                     setQuick("custom");
                   }}
-                  className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full sm:w-auto"
+                  className={UI.input}
                   aria-label="بداية المدى الزمني"
                 />
                 <span className="mx-1 opacity-60 hidden sm:inline">—</span>
@@ -650,12 +694,12 @@ export default function RepairsPage() {
                     setEndDate(e.target.value);
                     setQuick("custom");
                   }}
-                  className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full sm:w-auto"
+                  className={UI.input}
                   aria-label="نهاية المدى الزمني"
                 />
                 <button
                   onClick={load}
-                  className="mt-2 sm:mt-0 sm:ml-2 px-4 py-2 rounded-xl bg-blue-600 text-white w-full sm:w-auto"
+                  className={`${UI.btn} ${UI.btnPrimary} sm:ml-2`}
                 >
                   تطبيق
                 </button>
@@ -667,11 +711,9 @@ export default function RepairsPage() {
                 <input
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") load();
-                  }}
+                  onKeyDown={(e) => e.key === "Enter" && load()}
                   placeholder="بحث (اسم/هاتف/جهاز/عطل)"
-                  className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
+                  className={UI.input}
                   aria-label="بحث"
                 />
               </div>
@@ -679,7 +721,7 @@ export default function RepairsPage() {
                 <select
                   value={status}
                   onChange={(e) => setStatus(e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
+                  className={UI.input}
                   aria-label="تصفية بالحالة"
                 >
                   <option value="">كل الحالات</option>
@@ -695,7 +737,7 @@ export default function RepairsPage() {
                   <select
                     value={technician}
                     onChange={(e) => setTechnician(e.target.value)}
-                    className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-full"
+                    className={UI.input}
                     aria-label="تصفية بالفني"
                   >
                     <option value="">كل الفنيين</option>
@@ -711,173 +753,180 @@ export default function RepairsPage() {
           </section>
         </>
       )}
+
       {error && (
-        <div className="p-3 rounded-xl bg-red-50 text-red-800">{error}</div>
+        <div className="p-3 rounded-2xl bg-rose-50 text-rose-800">{error}</div>
       )}
 
-      {/* الديسكتوب */}
-      <section className="hidden md:block p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm overflow-x-auto">
-        <div className="flex items-center justify-between mb-2">
+      {/* ===== الديسكتوب ===== */}
+      <section
+        className={`${UI.card} p-0 shadow-sm overflow-hidden hidden md:block`}
+      >
+        <div className="flex items-center justify-between px-4 pt-3">
           <div className="text-sm opacity-70">
             النتائج: {loading ? "…" : list.length}
           </div>
         </div>
-        <table className="w-full text-sm border-separate [border-spacing:0]">
-          <thead className="sticky top-[0] bg-white dark:bg-gray-800 shadow-sm">
-            <tr className="text-right">
-              <Th>#</Th>
-              <Th>العميل</Th>
-              <Th>الهاتف</Th>
-              <Th>الجهاز</Th>
-              <Th>العطل</Th>
-              <Th>اللون</Th>
-              <Th>الفني</Th>
-              <Th>القسم الحالي</Th>
-              <Th>الحالة</Th>
-              <Th>السعر</Th>
-              <Th>تاريخ الإنشاء</Th>
-              <Th>إجراءات</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading ? (
-              <>
-                <SkeletonRow />
-                <SkeletonRow />
-                <SkeletonRow />
-              </>
-            ) : list.length === 0 ? (
-              <tr>
-                <td colSpan={12} className="p-0">
-                  <EmptyState />
-                </td>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border-separate [border-spacing:0]">
+            <thead className="sticky top-0 bg-white/95 dark:bg-gray-900/95 shadow-sm">
+              <tr className="text-right">
+                <Th>#</Th>
+                <Th>العميل</Th>
+                {/* <Th>الهاتف</Th> */}
+                <Th>الجهاز</Th>
+                <Th>العطل</Th>
+                <Th>اللون</Th>
+                <Th>الفني</Th>
+                <Th>القسم الحالي</Th>
+                <Th>الحالة</Th>
+                <Th>السعر</Th>
+                <Th>تاريخ الإنشاء</Th>
+                <Th>إجراءات</Th>
               </tr>
-            ) : (
-              list.map((r) => {
-                const old = isOldRepair(r, quick, startDate, endDate);
-                const basePrice = hasNum(r.price) ? Number(r.price) : null;
-                const finalPrice = hasNum(r.finalPrice)
-                  ? Number(r.finalPrice)
-                  : null;
+            </thead>
+            <tbody>
+              {loading ? (
+                <>
+                  <SkeletonRow />
+                  <SkeletonRow />
+                  <SkeletonRow />
+                </>
+              ) : list.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="p-0">
+                    <EmptyState />
+                  </td>
+                </tr>
+              ) : (
+                list.map((r) => {
+                  const old = isOldRepair(r, quick, startDate, endDate);
+                  const basePrice = hasNum(r.price) ? Number(r.price) : null;
+                  const finalPrice = hasNum(r.finalPrice)
+                    ? Number(r.finalPrice)
+                    : null;
+                  const depName =
+                    r.currentDepartment?.name ||
+                    depMap.get(String(r.currentDepartment || "")) ||
+                    "—";
 
-                const depName =
-                  r.currentDepartment?.name ||
-                  depMap.get(String(r.currentDepartment || "")) ||
-                  "—";
-
-                return (
-                  <tr
-                    key={r._id}
-                    className={`${
-                      r.hasWarranty ? "bg-amber-50/40 dark:bg-amber-900/10" : ""
-                    } odd:bg-gray-50 rounded-[4px] dark:odd:bg-gray-700/40 hover:bg-gray-100/60 dark:hover:bg-gray-700/60 transition ${
-                      old ? "ring-1 ring-yellow-200 dark:ring-yellow-700" : ""
-                    }`}
-                  >
-                    <Td>
-                      <div className="flex items-center gap-2 whitespace-nowrap">
-                        <span className="font-mono">#{r.repairId}</span>
-                        {old && (
-                          <span className="px-2 py-0.5 rounded-full text-[11px] bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200">
-                            قديمة
-                          </span>
-                        )}
-                        {r.hasWarranty && (
-                          <WarrantyBadge until={r.warrantyEnd} />
-                        )}
-                      </div>
-                    </Td>
-                    <Td>{r.customerName}</Td>
-                    <Td>{r.phone || "—"}</Td>
-                    <Td className="font-medium">{r.deviceType}</Td>
-                    <Td
-                      className="max-w-[220px] truncate"
-                      title={r.issue || ""}
+                  return (
+                    <tr
+                      key={r._id}
+                      className={`odd:bg-slate-50 dark:odd:bg-slate-800/40 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 transition ${
+                        r.hasWarranty
+                          ? "bg-amber-50/40 dark:bg-amber-900/10"
+                          : ""
+                      } ${
+                        old ? "ring-1 ring-amber-200 dark:ring-amber-700" : ""
+                      }`}
                     >
-                      {r.issue || "—"}
-                    </Td>
-                    <Td>{r.color || "—"}</Td>
-                    <Td>{r?.technician?.name || "—"}</Td>
-                    <Td>{depName}</Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={
-                            SHORT_STATUS.includes(r.status) ? r.status : ""
-                          }
-                          onChange={(e) =>
-                            changeStatusInline(r, e.target.value)
-                          }
-                          className="px-2 py-1 rounded-lg border w-[150px]"
-                        >
-                          <option value="">— اختر —</option>
-                          {SHORT_STATUS.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-
-                        {r.status === "مرفوض" && (
+                      <Td>
+                        <div className="flex items-center gap-2 whitespace-nowrap">
+                          <span className="font-mono">#{r.repairId}</span>
+                          {old && (
+                            <span
+                              className={`${UI.pill} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200`}
+                            >
+                              قديمة
+                            </span>
+                          )}
+                          {r.hasWarranty && (
+                            <WarrantyBadge until={r.warrantyEnd} />
+                          )}
+                        </div>
+                      </Td>
+                      <Td>{r.customerName}</Td>
+                      {/* <Td>{r.phone || "—"}</Td> */}
+                      <Td className="font-medium">{r.deviceType}</Td>
+                      <Td
+                        className="max-w-[240px] truncate"
+                        title={r.issue || ""}
+                      >
+                        {r.issue || "—"}
+                      </Td>
+                      <Td>{r.color || "—"}</Td>
+                      <Td>{r?.technician?.name || "—"}</Td>
+                      <Td>{depName}</Td>
+                      <Td>
+                        <div className="flex items-center gap-2">
                           <select
-                            value={r.rejectedDeviceLocation || "بالمحل"}
-                            onChange={(e) =>
-                              changeRejectedLocation(r, e.target.value)
+                            value={
+                              SHORT_STATUS.includes(r.status) ? r.status : ""
                             }
-                            className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200 mt-1"
-                            aria-label={`مكان الجهاز للصيانة رقم ${r.repairId}`}
-                            title="مكان الجهاز عند الرفض"
+                            onChange={(e) =>
+                              changeStatusInline(r, e.target.value)
+                            }
+                            className="px-2 py-1 rounded-lg border w-[150px]"
                           >
-                            <option value="بالمحل">بالمحل</option>
-                            <option value="مع العميل">مع العميل</option>
+                            <option value="">— اختر —</option>
+                            {SHORT_STATUS.map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
                           </select>
-                        )}
-                      </div>
-                    </Td>
-                    <Td>{finalPrice ?? basePrice ?? "—"}</Td>
-                    <Td>{formatDate(r.createdAt)}</Td>
-                    <Td>
-                      <div className="flex items-center gap-2">
-                        <Link
-                          to={`/repairs/${r._id}`}
-                          className="px-2 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
-                        >
-                          فتح
-                        </Link>
-                        {canEditAll && (
+
+                          {r.status === "مرفوض" && (
+                            <select
+                              value={r.rejectedDeviceLocation || "بالمحل"}
+                              onChange={(e) =>
+                                changeRejectedLocation(r, e.target.value)
+                              }
+                              className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-200 mt-1"
+                              aria-label={`مكان الجهاز للصيانة رقم ${r.repairId}`}
+                              title="مكان الجهاز عند الرفض"
+                            >
+                              <option value="بالمحل">بالمحل</option>
+                              <option value="مع العميل">مع العميل</option>
+                            </select>
+                          )}
+                        </div>
+                      </Td>
+                      <Td>{finalPrice ?? basePrice ?? "—"}</Td>
+                      <Td>{formatDate(r.createdAt)}</Td>
+                      <Td>
+                        <div className="flex items-center gap-2">
                           <Link
-                            to={`/repairs/${r._id}/edit`}
-                            className="px-2 py-1 rounded-lg bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
+                            to={`/repairs/${r._id}`}
+                            className={`${UI.btn} ${UI.btnGhost}`}
                           >
-                            تعديل
+                            فتح
                           </Link>
-                        )}
-                        {canDeleteAll && (
-                          <button
-                            onClick={() => handleDelete(r)}
-                            disabled={deletingId === r._id}
-                            className="px-2 py-1 rounded-lg bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 disabled:opacity-50"
-                            aria-label={`حذف الصيانة رقم ${r.repairId}`}
-                            title="حذف"
-                          >
-                            {deletingId === r._id}{" "}
-                            {deletingId === r._id ? "جارٍ…" : "حذف"}
-                          </button>
-                        )}
-                      </div>
-                    </Td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+                          {canEditAll && (
+                            <Link
+                              to={`/repairs/${r._id}/edit`}
+                              className={`${UI.btn} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200`}
+                            >
+                              تعديل
+                            </Link>
+                          )}
+                          {canDeleteAll && (
+                            <button
+                              onClick={() => handleDelete(r)}
+                              disabled={deletingId === r._id}
+                              className={`${UI.btn} bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50`}
+                              aria-label={`حذف الصيانة رقم ${r.repairId}`}
+                              title="حذف"
+                            >
+                              {deletingId === r._id ? "جارٍ…" : "حذف"}
+                            </button>
+                          )}
+                        </div>
+                      </Td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      {/* الموبايل */}
+      {/* ===== الموبايل ===== */}
       <section className="md:hidden space-y-2">
         {loading ? (
-          <div className="p-3 rounded-2xl bg-white dark:bg-gray-800 animate-pulse h-24" />
+          <div className={`${UI.card} p-4 animate-pulse h-24`} />
         ) : list.length === 0 ? (
           <EmptyState />
         ) : (
@@ -893,7 +942,6 @@ export default function RepairsPage() {
               finalPrice !== basePrice
                 ? ` (مبدئي: ${basePrice})`
                 : "";
-
             const depName =
               r.currentDepartment?.name ||
               depMap.get(String(r.currentDepartment || "")) ||
@@ -902,13 +950,13 @@ export default function RepairsPage() {
             return (
               <div
                 key={r._id}
-                className={`p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm ${
+                className={`${UI.card} p-3 shadow-sm ${
                   r.hasWarranty
-                    ? "border border-amber-300/60 bg-amber-50/40 dark:bg-amber-900/10"
+                    ? "border-amber-300/60 bg-amber-50/40 dark:bg-amber-900/10"
                     : ""
                 }`}
               >
-                <div className="flex items-center justify-between">
+                <div className="flex items-end justify-between flex-col">
                   <div className="font-bold flex items-center gap-2 whitespace-nowrap">
                     <span>
                       #{r.repairId} — {r.deviceType}
@@ -917,6 +965,7 @@ export default function RepairsPage() {
                   </div>
                   <StatusPill s={r.status} />
                 </div>
+
                 <div className="text-sm opacity-80">
                   {r.customerName} • {r.phone || "—"}
                 </div>
@@ -960,7 +1009,7 @@ export default function RepairsPage() {
                         onChange={(e) =>
                           changeRejectedLocation(r, e.target.value)
                         }
-                        className="px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                        className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-200"
                         aria-label="مكان الجهاز عند الرفض"
                       >
                         <option value="بالمحل">بالمحل</option>
@@ -971,14 +1020,14 @@ export default function RepairsPage() {
 
                   <Link
                     to={`/repairs/${r._id}`}
-                    className="px-3 py-1 rounded-lg bg-gray-200 dark:bg-gray-700"
+                    className={`${UI.btn} ${UI.btnGhost}`}
                   >
                     فتح
                   </Link>
                   {canEditAll && (
                     <Link
                       to={`/repairs/${r._id}/edit`}
-                      className="px-3 py-1 rounded-lg bg-blue-600 text-white"
+                      className={`${UI.btn} ${UI.btnPrimary}`}
                     >
                       تعديل
                     </Link>
@@ -987,7 +1036,7 @@ export default function RepairsPage() {
                     <button
                       onClick={() => handleDelete(r)}
                       disabled={deletingId === r._id}
-                      className="px-3 py-1 rounded-lg bg-red-600 text-white disabled:opacity-50"
+                      className={`${UI.btn} bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-50`}
                       aria-label={`حذف الصيانة رقم ${r.repairId}`}
                       title="حذف"
                     >
@@ -1021,17 +1070,19 @@ export default function RepairsPage() {
       {/* مودال تاريخ الضمان */}
       {showWarrantyModal && (
         <div className="fixed inset-0 grid place-items-center bg-black/40 z-50">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl w-[380px] space-y-3">
+          <div
+            className={`${UI.card} p-4 w-[380px] max-w-[92vw] space-y-3 shadow-xl`}
+          >
             <h3 className="text-lg font-semibold">حدد تاريخ انتهاء الضمان</h3>
             <input
               type="date"
-              className="border p-2 w-full rounded-xl"
+              className={UI.input}
               value={warrantyEnd}
               onChange={(e) => setWarrantyEnd(e.target.value)}
             />
             <div className="flex gap-2">
               <button
-                className="px-2 py-1 rounded-xl border"
+                className={`${UI.btn} ${UI.btnGhost}`}
                 onClick={() => {
                   const d = new Date();
                   d.setDate(d.getDate() + 7);
@@ -1041,7 +1092,7 @@ export default function RepairsPage() {
                 أسبوع
               </button>
               <button
-                className="px-2 py-1 rounded-xl border"
+                className={`${UI.btn} ${UI.btnGhost}`}
                 onClick={() => {
                   const d = new Date();
                   d.setDate(d.getDate() + 30);
@@ -1051,7 +1102,7 @@ export default function RepairsPage() {
                 شهر
               </button>
               <button
-                className="px-2 py-1 rounded-xl border"
+                className={`${UI.btn} ${UI.btnGhost}`}
                 onClick={() => {
                   const d = new Date();
                   d.setDate(d.getDate() + 90);
@@ -1063,7 +1114,7 @@ export default function RepairsPage() {
             </div>
             <div className="flex justify-end gap-2">
               <button
-                className="px-3 py-2 rounded-xl border"
+                className={`${UI.btn} ${UI.btnGhost}`}
                 onClick={() => {
                   setShowWarrantyModal(false);
                   setWarrantyTarget(null);
@@ -1073,7 +1124,7 @@ export default function RepairsPage() {
                 إلغاء
               </button>
               <button
-                className="px-3 py-2 rounded-xl bg-blue-600 text-white"
+                className={`${UI.btn} ${UI.btnPrimary}`}
                 onClick={async () => {
                   if (!warrantyTarget || !warrantyEnd) return;
                   await setWarranty(warrantyTarget._id, {
@@ -1149,20 +1200,20 @@ function AfterCompleteModal({ open, onClose, onPrint, onWhatsApp }) {
         </p>
         <div className="grid sm:grid-cols-2 gap-2">
           <button
-            className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
+            className={`${UI.btn} bg-emerald-600 hover:bg-emerald-700 text-white`}
             onClick={() => onPrint?.()}
           >
             طباعة إيصال الضمان
           </button>
           <button
-            className="px-3 py-2 rounded-xl bg-green-600 text-white"
+            className={`${UI.btn} bg-green-600 hover:bg-green-700 text-white`}
             onClick={() => onWhatsApp?.()}
           >
             إرسال رسالة واتساب
           </button>
         </div>
         <div className="flex justify-end">
-          <button className="px-3 py-2 rounded-xl border" onClick={onClose}>
+          <button className={`${UI.btn} ${UI.btnGhost}`} onClick={onClose}>
             إغلاق
           </button>
         </div>
@@ -1172,21 +1223,38 @@ function AfterCompleteModal({ open, onClose, onPrint, onWhatsApp }) {
 }
 
 /* ====== Sub Components ====== */
+function KPI({ title, value, tone = "slate" }) {
+  const toneMap = {
+    slate: "bg-slate-50 dark:bg-slate-800/50",
+    emerald: "bg-emerald-50 dark:bg-emerald-900/20",
+    indigo: "bg-indigo-50 dark:bg-indigo-900/20",
+    rose: "bg-rose-50 dark:bg-rose-900/20",
+    amber: "bg-amber-50 dark:bg-amber-900/20",
+  };
+  return (
+    <div
+      className={`rounded-2xl px-4 py-3 ${toneMap[tone]} ${UI.card} border-0`}
+    >
+      <div className="text-xs opacity-70">{title}</div>
+      <div className="text-xl font-bold">{value}</div>
+    </div>
+  );
+}
 function Th({ children }) {
   return (
-    <th className="p-2 text-xs font-semibold text-gray-600 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+    <th className="p-3 text-xs font-semibold text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700">
       {children}
     </th>
   );
 }
 function Td({ children, className = "" }) {
-  return <td className={`p-2 align-center ${className}`}>{children}</td>;
+  return <td className={`p-3 align-middle ${className}`}>{children}</td>;
 }
 function Info({ label, value }) {
   return (
-    <div className="p-2 rounded-xl bg-gray-50 dark:bg-gray-700/40">
+    <div className="p-2 rounded-xl bg-slate-50 dark:bg-slate-800/50">
       <div className="text-[11px] opacity-70">{label}</div>
-      <div className="font-medium">{value}</div>
+      <div className="font-medium break-words">{value}</div>
     </div>
   );
 }

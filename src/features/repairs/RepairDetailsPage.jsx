@@ -12,6 +12,19 @@ import API, { RepairsAPI, DepartmentsAPI } from "../../lib/api";
 import QrAfterCreateModal from "../../components/QrAfterCreateModal";
 import DeliveryModal from "../../components/DeliveryModal";
 
+/* ========= Theme / Palette ========= */
+const PALETTE = {
+  card: "bg-white/90 dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 backdrop-blur",
+  subtle: "bg-slate-50 dark:bg-slate-800/70",
+  primary:
+    "bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 text-white",
+  outline:
+    "border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800",
+  danger: "bg-rose-600 hover:bg-rose-700 text-white",
+  ok: "bg-emerald-600 hover:bg-emerald-700 text-white",
+  grayBtn: "bg-gray-200 dark:bg-gray-700",
+};
+
 /* ========= Helpers ========= */
 function toNum(v) {
   const n = Number(v);
@@ -155,7 +168,6 @@ export default function SingleRepairPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // تحديث عبر إيفنت خارجي (لو backend بث)
   useEffect(() => {
     const h = async () => {
       await loadRepairBase();
@@ -163,7 +175,6 @@ export default function SingleRepairPage() {
     };
     window.addEventListener("repairs:refresh", h);
     return () => window.removeEventListener("repairs:refresh", h);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function handleStatusPick(nextStatus) {
@@ -395,48 +406,82 @@ export default function SingleRepairPage() {
 
   const cur = info.flows?.length ? info.flows[info.flows.length - 1] : null;
   const isCurrentCompleted = cur && cur.status === "completed";
+  // fallback لو PALETTE مش متعرّف
+  const CARD =
+    (typeof PALETTE !== "undefined" && PALETTE.card) ||
+    "bg-white/90 dark:bg-zinc-900/90 border border-slate-200 dark:border-slate-800";
+  const SUBTLE =
+    (typeof PALETTE !== "undefined" && PALETTE.subtle) ||
+    "bg-slate-50 dark:bg-slate-800/60";
 
+  // ألوان الشارات حسب النوع
+  const TYPE_STYLE = {
+    create:
+      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200",
+    update: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200",
+    status_change:
+      "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200",
+    assign_technician:
+      "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+    flow_complete:
+      "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-200",
+    move_next:
+      "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200",
+    delete: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
+  };
+
+  const count = (info.logs || []).length;
   return (
-    <div
-      className={`space-y-6 ${repair?.hasWarranty || null ? "goldOne" : ""}`}
-    >
-      <header className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">صيانة #{repair.repairId ?? "—"}</h1>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => {
-              const token = repair?.publicTracking?.token;
-              const url = token ? `${window.location.origin}/t/${token}` : "";
-              if (!url) {
-                alert("لم يتم تفعيل التتبّع بعد.");
-                return;
-              }
-              setQrOpen(true);
-            }}
-            className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
-          >
-            تتبُّع/QR
-          </button>
+    <div className="space-y-6">
+      {/* ===== Gradient Header ===== */}
+      <div className="rounded-3xl overflow-hidden">
+        <div className="bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 text-white p-6 md:p-8">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl md:text-3xl font-bold">
+                صيانة #{repair.repairId ?? "—"}
+              </h1>
+              <p className="opacity-90 mt-1">
+                تابع الحالة والخطوات وأرسل تحديثات للعميل بسهولة.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const token = repair?.publicTracking?.token;
+                  const url = token
+                    ? `${window.location.origin}/t/${token}`
+                    : "";
+                  if (!url) {
+                    alert("لم يتم تفعيل التتبّع بعد.");
+                    return;
+                  }
+                  setQrOpen(true);
+                }}
+                className="px-3 py-2 rounded-xl bg-white/90 text-indigo-700 hover:opacity-90"
+              >
+                تتبُّع/QR
+              </button>
 
-          {(isAdmin || user?.permissions?.editRepair) && (
-            <Link
-              to={`/repairs/${id}/edit`}
-              className="px-3 py-2 rounded-xl bg-blue-600 text-white"
-            >
-              تعديل
-            </Link>
-          )}
-          <Link
-            to="/repairs"
-            className="px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700"
-          >
-            رجوع
-          </Link>
+              {(isAdmin || user?.permissions?.editRepair) && (
+                <Link
+                  to={`/repairs/${id}/edit`}
+                  className="px-3 py-2 rounded-xl bg-white/90 text-indigo-700 hover:opacity-90"
+                >
+                  تعديل
+                </Link>
+              )}
+
+              <Link to="/repairs" className="px-3 py-2 rounded-xl bg-white/20">
+                رجوع
+              </Link>
+            </div>
+          </div>
         </div>
-      </header>
+      </div>
 
-      {/* الحالة الرئيسية (مختصرة) */}
-      <section className="p-3 rounded-xl bg-white dark:bg-gray-800">
+      {/* ===== الحالة + معلومات مختصرة ===== */}
+      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <div className="grid md:grid-cols-4 gap-3 items-end">
           <div>
             <div className="text-sm opacity-80 mb-1">الحالة</div>
@@ -484,60 +529,68 @@ export default function SingleRepairPage() {
             value={info.currentDepartment?.name || "—"}
           />
           <Info label="تاريخ الإنشاء" value={formatDate(repair.createdAt)} />
-          <Info label="الفني" value={repair?.technician?.name || "—"} />
+          {/* <Info label="الفني" value={repair?.technician?.name || "—"} /> */}
         </div>
       </section>
 
-      {/* التايملاين */}
-      <div className="grid gap-3">
+      {/* ===== التايملاين ===== */}
+      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+        <h3 className="text-lg font-semibold mb-3">الخطوات</h3>
         {(info.flows || []).length === 0 ? (
           <div className="opacity-70">لا توجد خطوات بعد. عيّن قسمًا للبدء.</div>
         ) : (
-          info.flows.map((f, i) => (
-            <div key={f._id} className="p-3 rounded-xl border">
-              <div className="flex flex-wrap items-center gap-2 justify-between">
-                <div className="font-semibold">
-                  {i + 1}. {f.department?.name || "قسم"}
+          <div className="grid sm:grid-cols-2 gap-3">
+            {info.flows.map((f, i) => (
+              <div
+                key={f._id}
+                className={`p-3 rounded-2xl ${PALETTE.subtle} border dark:border-slate-700`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="font-semibold">
+                    {i + 1}. {f.department?.name || "قسم"}
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full border dark:border-slate-600">
+                    {STATUS_AR[f.status] || f.status}
+                  </span>
                 </div>
-                <div className={`text-xs px-2 py-1 rounded-full border`}>
-                  {STATUS_AR[f.status] || f.status}
+                <div className="text-sm mt-1">
+                  فنّي:{" "}
+                  <b>
+                    {f.technician
+                      ? f.technician.name ||
+                        f.technician.username ||
+                        f.technician.email
+                      : "غير معيّن"}
+                  </b>
+                  {" · "}السعر: <b>{Number(f.price || 0).toFixed(2)}</b>
                 </div>
+                <div className="text-xs opacity-70 mt-1">
+                  بدأ:{" "}
+                  {f.startedAt ? new Date(f.startedAt).toLocaleString() : "-"} |
+                  اكتمل:{" "}
+                  {f.completedAt
+                    ? new Date(f.completedAt).toLocaleString()
+                    : "-"}
+                </div>
+                {f.notes && (
+                  <div className="text-sm mt-1">ملاحظات: {f.notes}</div>
+                )}
               </div>
-              <div className="text-sm mt-1">
-                فنّي:{" "}
-                <b>
-                  {f.technician
-                    ? f.technician.name ||
-                      f.technician.username ||
-                      f.technician.email
-                    : "غير معيّن"}
-                </b>
-                {" · "}السعر: <b>{Number(f.price || 0).toFixed(2)}</b>
-              </div>
-              <div className="text-xs opacity-70 mt-1">
-                بدأ:{" "}
-                {f.startedAt ? new Date(f.startedAt).toLocaleString() : "-"} |
-                اكتمل:{" "}
-                {f.completedAt ? new Date(f.completedAt).toLocaleString() : "-"}
-              </div>
-              {f.notes && (
-                <div className="text-sm mt-1">ملاحظات: {f.notes}</div>
-              )}
-            </div>
-          ))
+            ))}
+          </div>
         )}
-      </div>
 
-      {/* إجمالي تسعير الأقسام */}
-      <div className="p-3 rounded-xl border bg-gray-50 dark:bg-zinc-900">
-        إجمالي تسعير الأقسام:{" "}
-        <b>{Number(info.departmentPriceTotal || 0).toFixed(2)}</b>
-      </div>
+        {/* إجمالي تسعير الأقسام */}
+        <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
+          إجمالي تسعير الأقسام:{" "}
+          <b>{Number(info.departmentPriceTotal || 0).toFixed(2)}</b>
+        </div>
+      </section>
 
-      {/* التحكم في الخطوة الحالية */}
-      <div className="grid gap-4 p-4 rounded-2xl border">
-        <h3 className="font-semibold">الخطوة الحالية</h3>
-        <div className="text-sm">
+      {/* ===== التحكم في الخطوة الحالية ===== */}
+      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+        <h3 className="text-lg font-semibold mb-3">الخطوة الحالية</h3>
+        <div className="text-sm mb-2">
           القسم الحالي: <b>{info.currentDepartment?.name || "-"}</b>
         </div>
 
@@ -574,13 +627,13 @@ export default function SingleRepairPage() {
         </div>
 
         {/* إكمال الخطوة الحالية + تسعيرها */}
-        <div className="flex flex-wrap items-end gap-2">
+        <div className="flex flex-wrap items-end gap-2 mt-4">
           <div>
             <label className="block text-sm mb-1">سعر القسم</label>
             <input
               type="number"
               step="0.01"
-              className="border rounded-lg px-3 py-2"
+              className="border rounded-lg px-3 py-2 w-36"
               value={stepPrice}
               onChange={(e) => setStepPrice(e.target.value)}
             />
@@ -618,7 +671,7 @@ export default function SingleRepairPage() {
         </div>
 
         {/* نقل للخطوة/القسم التالي */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 mt-4">
           <select
             className="border rounded-lg px-3 py-2"
             value={nextDept}
@@ -652,22 +705,25 @@ export default function SingleRepairPage() {
             نقل الصيانة للقسم التالي
           </ActionButton>
         </div>
-      </div>
-
-      {/* بيانات أساسية */}
-      <section className="p-3 rounded-xl bg-white dark:bg-gray-800 grid grid-cols-2 gap-3">
-        <Info label="العميل" value={repair.customerName || "—"} />
-        <Info label="الهاتف" value={repair.phone || "—"} />
-        <Info label="الجهاز" value={repair.deviceType || "—"} />
-        <Info label="اللون" value={repair.color || "—"} />
-        <Info label="العطل" value={repair.issue || "—"} />
-        <Info label="السعر المتفق عليه" value={numOrDash(repair.price)} />
-        <Info label="السعر النهائي" value={numOrDash(repair.finalPrice)} />
-        <Info label="ملاحظات" value={repair.notes || "—"} />
       </section>
 
-      {/* إرسال تحديث للعميل */}
-      <section className="mt-4 p-3 rounded-2xl border">
+      {/* ===== بيانات أساسية ===== */}
+      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+        <h3 className="text-lg font-semibold mb-3">البيانات الأساسية</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Info label="العميل" value={repair.customerName || "—"} />
+          <Info label="الهاتف" value={repair.phone || "—"} />
+          <Info label="الجهاز" value={repair.deviceType || "—"} />
+          <Info label="اللون" value={repair.color || "—"} />
+          <Info label="العطل" value={repair.issue || "—"} />
+          <Info label="السعر المتفق عليه" value={numOrDash(repair.price)} />
+          <Info label="السعر النهائي" value={numOrDash(repair.finalPrice)} />
+          <Info label="ملاحظات" value={repair.notes || "—"} />
+        </div>
+      </section>
+
+      {/* ===== إرسال تحديث للعميل ===== */}
+      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <div className="font-semibold mb-2">إرسال تحديث للعميل</div>
         <div className="grid gap-2">
           <label className="text-sm">النوع</label>
@@ -699,7 +755,7 @@ export default function SingleRepairPage() {
           <div className="flex justify-end">
             <button
               disabled={cuSending}
-              className="px-4 py-2 rounded-xl bg-blue-600 text-white"
+              className={`px-4 py-2 rounded-xl ${PALETTE.primary} disabled:opacity-50`}
               onClick={async () => {
                 setCuSending(true);
                 try {
@@ -722,35 +778,135 @@ export default function SingleRepairPage() {
         </div>
       </section>
 
-      {/* السجل (بصياغة ودّية) */}
-      <section className="grid gap-2">
-        <h3 className="font-semibold">سجل الحركات</h3>
-        <div className="overflow-x-auto">
-          <table className="min-w-[680px] w-full text-sm">
-            <thead>
-              <tr className="border-b">
-                <th className="py-2 px-2">الوقت</th>
-                <th className="py-2 px-2">النوع</th>
-                <th className="py-2 px-2">التفاصيل</th>
+      {/* ===== السجل ===== */}
+      <section dir="rtl" className={`p-4 md:p-5 rounded-2xl ${CARD} shadow-sm`}>
+        {/* عنوان وعداد */}
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <h3 className="font-semibold text-base md:text-lg flex items-center gap-2">
+            <span
+              className="inline-flex w-2 h-2 rounded-full bg-indigo-500"
+              aria-hidden
+            />
+            سجل الحركات
+          </h3>
+          <span className="text-xs md:text-sm px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+            {count} حدث
+          </span>
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
+          <table className="min-w-[760px] w-full text-sm">
+            <thead className="sticky top-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-zinc-900/70">
+              <tr className="border-b border-slate-200 dark:border-slate-800 text-right">
+                <th className="py-2.5 px-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  الوقت
+                </th>
+                <th className="py-2.5 px-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  النوع
+                </th>
+                <th className="py-2.5 px-3 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                  التفاصيل
+                </th>
               </tr>
             </thead>
             <tbody>
-              {(info.logs || []).length === 0 ? (
+              {count === 0 ? (
                 <tr>
-                  <td colSpan={3} className="py-3 px-2 opacity-70">
+                  <td colSpan={3} className="py-6 px-3 text-center opacity-70">
                     لا يوجد سجل.
                   </td>
                 </tr>
               ) : (
                 info.logs.map((lg, i) => (
-                  <LogRow key={i} log={lg} deps={deps} flows={info.flows} />
+                  <tr
+                    key={i}
+                    className="odd:bg-slate-50/60 dark:odd:bg-zinc-800/40 hover:bg-slate-100/60 dark:hover:bg-zinc-800/60 transition-colors border-b border-slate-200/70 dark:border-slate-800/70 align-top"
+                  >
+                    <td className="py-2.5 px-3 align-middle whitespace-nowrap text-[13px] opacity-80">
+                      {new Date(
+                        lg.at || lg.createdAt || Date.now()
+                      ).toLocaleString("ar-EG")}
+                    </td>
+                    <td className="py-2.5 px-3 align-middle">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                          TYPE_STYLE[lg.type] ||
+                          "bg-slate-100 text-slate-800 dark:bg-slate-700"
+                        }`}
+                      >
+                        {/* نقطة ملونة صغيرة */}
+                        <span
+                          className="w-1.5 h-1.5 rounded-full bg-current opacity-70"
+                          aria-hidden
+                        />
+                        {TYPE_AR?.[lg.type] || lg.type}
+                      </span>
+                    </td>
+                    <td className="py-2.5 px-3">
+                      {/* نعيد استخدام LogRow لو عندك تفاصيله—أو نعرض الوصف المختصر */}
+                      <LogRow log={lg} deps={deps} flows={info.flows} />
+                    </td>
+                  </tr>
                 ))
               )}
             </tbody>
           </table>
         </div>
+
+        {/* Mobile cards */}
+        <div className="md:hidden grid gap-2">
+          {count === 0 ? (
+            <div className="opacity-70">لا يوجد سجل.</div>
+          ) : (
+            info.logs.map((lg, i) => {
+              const { summary, details } = describeLog(lg, {
+                deps,
+                flows: info.flows,
+              });
+              const timeTxt = new Date(
+                lg.at || lg.createdAt || Date.now()
+              ).toLocaleString("ar-EG");
+              const pill =
+                TYPE_STYLE[lg.type] ||
+                "bg-slate-100 text-slate-800 dark:bg-slate-700";
+              return (
+                <article
+                  key={i}
+                  className={`p-3 rounded-2xl ${SUBTLE} border border-slate-200/80 dark:border-slate-700 shadow-xs`}
+                  aria-label={`حدث: ${TYPE_AR?.[lg.type] || lg.type}`}
+                >
+                  <header className="flex items-center justify-between gap-2">
+                    <time
+                      dateTime={lg.at || lg.createdAt}
+                      className="text-[11px] opacity-70"
+                    >
+                      {timeTxt}
+                    </time>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[11px] font-semibold ${pill}`}
+                    >
+                      {TYPE_AR?.[lg.type] || lg.type}
+                    </span>
+                  </header>
+
+                  <h4 className="text-sm mt-2 font-semibold">{summary}</h4>
+
+                  {Array.isArray(details) && details.length > 0 && (
+                    <ul className="list-disc pr-5 mt-1 space-y-1 text-[13px] leading-5">
+                      {details.map((d, j) => (
+                        <li key={j}>{d}</li>
+                      ))}
+                    </ul>
+                  )}
+                </article>
+              );
+            })
+          )}
+        </div>
       </section>
 
+      {/* ===== Modals ===== */}
       <QrAfterCreateModal
         open={qrOpen}
         onClose={() => setQrOpen(false)}
@@ -806,7 +962,7 @@ export default function SingleRepairPage() {
                 إلغاء
               </button>
               <button
-                className="px-3 py-2 rounded-xl bg-blue-600 text-white"
+                className={`px-3 py-2 rounded-xl ${PALETTE.primary}`}
                 onClick={async () => {
                   if (!warrantyEnd) return;
                   await setWarranty(repair._id, {
@@ -842,15 +998,19 @@ export default function SingleRepairPage() {
           hasWarranty={!!(repair?.hasWarranty && repair?.warrantyEnd)}
         />
       )}
+
+      {/* Inputs base style */}
+      <style>{`.inp{padding:.6rem .8rem;border-radius:.9rem;background:var(--inp-bg,#f3f4f6)}`}</style>
     </div>
   );
 }
 
+/* ===== Small UI helpers ===== */
 function ActionButton({ children, onClick, disabled }) {
   const [busy, setBusy] = useState(false);
   return (
     <button
-      className="px-3 py-2 rounded-lg border disabled:opacity-50"
+      className={`px-3 py-2 rounded-lg ${PALETTE.outline} disabled:opacity-50`}
       disabled={disabled || busy}
       onClick={async () => {
         try {
@@ -869,7 +1029,7 @@ function ActionButton({ children, onClick, disabled }) {
 function Info({ label, value, children }) {
   const v = value ?? children ?? "—";
   return (
-    <div className="p-3 rounded-lg bg-gray-100 dark:bg-gray-700">
+    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
       <div className="text-xs opacity-70">{label}</div>
       <div className="font-semibold break-words">{v}</div>
     </div>
@@ -1016,12 +1176,12 @@ function describeLog(log, { deps = [], flows = [] } = {}) {
   return out;
 }
 function LogRow({ log, deps, flows }) {
-  const { summary, details, partsChange } = describeLog(log, { deps, flows });
+  const { summary, details } = describeLog(log, { deps, flows });
   const timeTxt = new Date(
     log.at || log.createdAt || Date.now()
   ).toLocaleString("ar-EG");
   return (
-    <tr className="border-b align-top">
+    <tr className="align-top">
       <td className="py-2 px-2 whitespace-nowrap">{timeTxt}</td>
       <td className="py-2 px-2 whitespace-nowrap">
         {TYPE_AR[log.type] || log.type}
@@ -1034,14 +1194,6 @@ function LogRow({ log, deps, flows }) {
               <li key={i}>{d}</li>
             ))}
           </ul>
-        )}
-        {partsChange && typeof PartsChange === "function" && (
-          <div className="mt-2">
-            <PartsChange
-              fromVal={partsChange.fromVal}
-              toVal={partsChange.toVal}
-            />
-          </div>
         )}
       </td>
     </tr>
@@ -1063,4 +1215,55 @@ function formatDate(d) {
   } catch {
     return "—";
   }
+}
+
+/* ===== مودال ما بعد الإكمال/التسليم ===== */
+function AfterCompleteModal({
+  open,
+  onClose,
+  onPrint,
+  onWhatsApp,
+  hasWarranty,
+}) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
+      <div className="bg-white dark:bg-gray-800 w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
+        <h3 className="text-lg font-semibold">تم إنهاء العملية</h3>
+        <p className="text-sm opacity-80">
+          {hasWarranty
+            ? "هل تودّ طباعة إيصال الضمان أو مراسلة العميل على واتساب؟"
+            : "هل تودّ مراسلة العميل على واتساب؟"}
+        </p>
+        <div
+          className={`grid ${
+            hasWarranty ? "sm:grid-cols-2" : "sm:grid-cols-1"
+          } gap-2`}
+        >
+          {hasWarranty && (
+            <button
+              className={`px-3 py-2 rounded-xl ${PALETTE.ok}`}
+              onClick={() => onPrint?.()}
+            >
+              طباعة إيصال الضمان
+            </button>
+          )}
+          <button
+            className={`px-3 py-2 rounded-xl bg-green-600 text-white`}
+            onClick={() => onWhatsApp?.()}
+          >
+            إرسال رسالة واتساب
+          </button>
+        </div>
+        <div className="flex justify-end">
+          <button
+            className={`px-3 py-2 rounded-xl ${PALETTE.outline}`}
+            onClick={onClose}
+          >
+            إغلاق
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

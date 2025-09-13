@@ -96,7 +96,7 @@ export default function RepairReceipt({
         {logoUrl ? <img className="logo" src={logoUrl} alt="logo" /> : null}
         <div>
           <div className="title">{shopName}</div>
-          <div className="badge">كشف حساب</div>
+          <div className="badge">إيصال استلام</div>
         </div>
         <div style={{ marginInlineStart: "auto" }} className="ticket-no">
           {fmt(ticketNo)}

@@ -11,7 +11,7 @@ const InputField = ({
   disabled,
   className,
 }) => (
-  <div className=" input-field">
+  <div className="w-full input-field">
     {label && <label className="block mb-1 font-semibold">{label}</label>}
     <input
       type={type}

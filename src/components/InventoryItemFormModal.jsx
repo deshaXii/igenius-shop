@@ -55,7 +55,11 @@ export default function InventoryItemFormModal({
 
   return (
     <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
-      <div className="bg-white dark:bg-gray-800 w-[520px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
+      <div
+        className="bg-white dark:bg-gray-800 w-[520px] 
+      overflow-y-auto h-[80vh] md:h-[auto] 
+      max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl"
+      >
         <h3 className="text-lg font-semibold">
           {initial ? "تعديل عنصر" : "إضافة عنصر للمخزن"}
         </h3>
