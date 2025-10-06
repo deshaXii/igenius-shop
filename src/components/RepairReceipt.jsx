@@ -1,169 +1,158 @@
-import React, { useMemo } from "react";
+// src/components/RepairReceipt.jsx
+import React from "react";
 
 /**
- * props:
- * - shopName        : string (مثلاً "IGenius")
- * - ticketNo        : string|number (مثلاً repair.serial || repair.code || repair._id.slice(-6))
- * - customerName    : string
- * - customerPhone   : string
- * - deviceType      : string (نوع/ماركة الجهاز)
- * - repairSummary   : string (صيـانة الجهاز)
- * - handoverAt      : string|Date (وقت التسليم للعميل المتوقع)
- * - receivedAt      : string|Date (وقت الاستلام من العميل)
- * - price           : number
- * - paid            : number
- * - logoUrl         : string (اختياري: لوجو IGenius)
- * - qrDataUrl       : string (اختياري: QR كـ dataURL لو عايز تطبعه أعلى الإيصال)
+ * Thermal-friendly receipt component.
+ * يعتمد بالكامل على الـprops — بدون جلب بيانات من الخارج.
+ *
+ * Props الأساسية (كما تُمرَّر من QrAfterCreateModal):
+ * - shopName
+ * - ticketNo
+ * - customerName
+ * - customerPhone
+ * - deviceType
+ * - repairSummary
+ * - handoverAt
+ * - receivedAt
+ * - price
+ * - paid
+ * - logoUrl
+ * - qrDataUrl
+ *
+ * إعدادات الإيصال:
+ * - receiptMessage (نص يظهر تحت "يرجى إحضار ...")
+ * - receiptFontSizePt
+ * - receiptPaperWidthMm
+ * - receiptMarginMm
+ *
+ * الهوامش وأحجام الطباعة النهائية تُطبَّق من دالة الطباعة في QrAfterCreateModal،
+ * هنا نحافظ فقط على بنية نظيفة.
  */
-export default function RepairReceipt({
-  shopName = "IGenius",
-  ticketNo = "",
-  customerName = "",
-  customerPhone = "",
-  deviceType = "",
-  repairSummary = "",
-  handoverAt = "",
-  receivedAt = "",
-  price = 0,
-  paid = 0,
-  logoUrl = "/icons/icon-192.png",
-  qrDataUrl = null,
-}) {
-  const today = useMemo(() => {
-    const d = new Date();
-    return d.toLocaleDateString("ar-EG", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-  }, []);
-  const weekday = useMemo(() => {
-    const d = new Date();
-    return d.toLocaleDateString("ar-EG", { weekday: "long" });
-  }, []);
 
-  const fmt = (v) => (v ? String(v) : "..................");
-  const fmtDateTime = (v) => {
-    if (!v) return "..................";
-    const d = new Date(v);
-    if (isNaN(d)) return fmt(v);
-    return d.toLocaleString("ar-EG", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+export default function RepairReceipt(props) {
+  const {
+    shopName = "",
+    ticketNo = "",
+    customerName = "",
+    customerPhone = "",
+    deviceType = "",
+    repairSummary = "",
+    handoverAt = "",
+    receivedAt = "",
+    price = 0,
+    paid = 0,
+    logoUrl = "",
+    qrDataUrl = "",
+    // إعدادات الإيصال
+    receiptMessage = "",
+  } = props;
+
+  const fmt = (v) => {
+    if (!v && v !== 0) return "—";
+    if (typeof v === "number") return v.toFixed(0);
+    try {
+      const d = new Date(v);
+      if (!isNaN(d)) return d.toLocaleString("ar-EG");
+    } catch {}
+    return String(v);
   };
-  const rest = Math.max(0, Number(price || 0) - Number(paid || 0));
 
   return (
-    <div className="receipt rtl" dir="rtl">
-      <style>{`
-        /* حجم طباعة حراري 80mm */
-        @page { size: 80mm auto; margin: 5mm; }
-        .receipt {
-          width: 72mm; /* داخل هوامش الصفحة */
-          font-family: "Cairo", system-ui, -apple-system, Segoe UI, Roboto, "Noto Kufi Arabic", Arial, sans-serif;
-          color: #111827;
-          line-height: 1.4;
-        }
-        .header {
-          display:flex; align-items:center; gap:.6rem; margin-bottom:.3rem;
-        }
-        .logo { width: 26px; height: 26px; object-fit: contain; }
-        .title {
-          font-weight: 800; letter-spacing: .5px; font-size: 16px;
-        }
-        .badge {
-          display:inline-block; border:1px solid #111; padding:2px 6px; border-radius:10px;
-          font-size: 11px; margin-top:2px;
-        }
-        .ticket-no { color:#ef4444; font-weight:700; font-size:14px; }
-        .row { display:flex; justify-content:space-between; gap:.75rem; margin: 4px 0; }
-        .k { color:#4b5563; min-width: 88px; }
-        .v { flex: 1; text-align: right; border-bottom: 1px dotted #9ca3af; }
-        .section { margin-top:.35rem; }
-        .sig { height:48px; border:1px dashed #d1d5db; border-radius:8px; display:flex; align-items:center; justify-content:center; margin-top:.4rem; }
-        .footer { margin-top:.5rem; font-size:11px; color:#6b7280; text-align:center;}
-        /* إخفاء أي أزرار في وضع الطباعة */
-        @media print {
-          .no-print { display:none !important; }
-        }
-      `}</style>
+    <div
+      dir="rtl"
+      style={{
+        fontFamily:
+          'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Naskh Arabic", "Noto Kufi Arabic", Tahoma, Arial',
+        lineHeight: 1.35,
+      }}
+    >
+      {/* رأس */}
+      <div style={{ textAlign: "center" }}>
+        {logoUrl ? (
+          <img
+            src={logoUrl}
+            alt="logo"
+            style={{ width: 64, height: 64, margin: "0 auto 6px" }}
+          />
+        ) : null}
+        <div style={{ fontWeight: 700 }}>{shopName || "المحل"}</div>
+        <div style={{ fontSize: 12, opacity: 0.75 }}>إيصال استلام</div>
+      </div>
 
-      <div className="header">
-        {logoUrl ? <img className="logo" src={logoUrl} alt="logo" /> : null}
+      <hr style={{ borderTop: "1px dashed #bbb", margin: "6px 0" }} />
+
+      {/* بيانات أساسية */}
+      <div style={{ fontSize: 12 }}>
         <div>
-          <div className="title">{shopName}</div>
-          <div className="badge">إيصال استلام</div>
+          رقم الإيصال: <b>{ticketNo || "—"}</b>
         </div>
-        <div style={{ marginInlineStart: "auto" }} className="ticket-no">
-          {fmt(ticketNo)}
+        <div>
+          العميل: <b>{customerName || "—"}</b>
+        </div>
+        <div>
+          الهاتف: <b dir="ltr">{customerPhone || "—"}</b>
+        </div>
+        <div>
+          الجهاز: <b>{deviceType || "—"}</b>
+        </div>
+        {repairSummary ? (
+          <div>
+            الملخص: <b>{repairSummary}</b>
+          </div>
+        ) : null}
+      </div>
+
+      <hr style={{ borderTop: "1px dashed #bbb", margin: "6px 0" }} />
+
+      {/* أوقات/مبالغ */}
+      <div style={{ fontSize: 12 }}>
+        <div>
+          تاريخ الاستلام: <b>{fmt(receivedAt)}</b>
+        </div>
+        {handoverAt ? (
+          <div>
+            تاريخ التسليم المتوقع: <b>{fmt(handoverAt)}</b>
+          </div>
+        ) : null}
+        <div>
+          التكلفة التقديرية: <b>{fmt(price)}</b>
+        </div>
+        <div>
+          المدفوع: <b>{fmt(paid)}</b>
         </div>
       </div>
 
       {qrDataUrl ? (
-        <div
-          style={{ display: "flex", justifyContent: "center", margin: "6px 0" }}
-        >
-          <img src={qrDataUrl} alt="QR" style={{ width: 72, height: 72 }} />
-        </div>
+        <>
+          <hr style={{ borderTop: "1px dashed #bbb", margin: "6px 0" }} />
+          <div style={{ textAlign: "center" }}>
+            <img
+              src={qrDataUrl}
+              alt="QR"
+              style={{
+                width: 140,
+                height: 140,
+                display: "inline-block",
+                background: "#fff",
+              }}
+            />
+          </div>
+        </>
       ) : null}
 
-      <div className="section">
-        <div className="row">
-          <div className="k">اليوم</div>
-          <div className="v">{weekday}</div>
-        </div>
-        <div className="row">
-          <div className="k">التاريخ</div>
-          <div className="v">{today}</div>
-        </div>
-        <div className="row">
-          <div className="k">اسم العميل</div>
-          <div className="v">{fmt(customerName)}</div>
-        </div>
-        <div className="row">
-          <div className="k">رقم التليفون</div>
-          <div className="v">{fmt(customerPhone)}</div>
-        </div>
-        <div className="row">
-          <div className="k">نوع الجهاز</div>
-          <div className="v">{fmt(deviceType)}</div>
-        </div>
-        <div className="row">
-          <div className="k">نوع الصيانة</div>
-          <div className="v">{fmt(repairSummary)}</div>
-        </div>
-        {/* <div className="row">
-          <div className="k">وقت التسليم</div>
-          <div className="v">{fmtDateTime(handoverAt)}</div>
-        </div> */}
-        <div className="row">
-          <div className="k">وقت الاستلام</div>
-          <div className="v">{fmtDateTime(receivedAt)}</div>
-        </div>
-        <div className="row">
-          <div className="k">السعر</div>
-          <div className="v">{Number(price || 0).toFixed(2)} ج.م</div>
-        </div>
-        <div className="row">
-          <div className="k">دفع</div>
-          <div className="v">{Number(paid || 0).toFixed(2)} ج.م</div>
-        </div>
-        <div className="row">
-          <div className="k">باقي</div>
-          <div className="v">{rest.toFixed(2)} ج.م</div>
-        </div>
-        <div className="row">
-          <div className="k">توقيع المدير</div>
-          <div className="v">&nbsp;</div>
-        </div>
-        <div className="sig">—</div>
-      </div>
+      <hr style={{ borderTop: "1px dashed #bbb", margin: "6px 0" }} />
 
-      <div className="footer">* يُرجى إحضار هذه الورقة عند الاستلام</div>
+      {/* النص الإجباري + الرسالة القابلة للتخصيص */}
+      <div style={{ fontSize: 11 }}>
+        يُرجى إحضار هذه الورقة عند الاستلام
+      </div>
+      {receiptMessage ? (
+        <div style={{ fontSize: 11, marginTop: 4 }}>{receiptMessage}</div>
+      ) : null}
+
+      <div style={{ fontSize: 10, opacity: 0.7, marginTop: 6, textAlign: "center" }}>
+        شكراً لثقتكم بنا
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import API from "../../lib/api";
 import SupplierSelect from "../../components/parts/SupplierSelect";
+import { listSuppliers } from "../../lib/suppliersApi";
 
 /** تصنيف موحّد */
 const CATEGORIES = [
@@ -10,7 +11,7 @@ const CATEGORIES = [
 
 /** لوحة ألوان/ستايلات مختصرة */
 const UI = {
-  card: "bg-white/90 dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 rounded-2xl",
+  card: "bg-white dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 rounded-2xl",
   subtle: "bg-slate-50 dark:bg-slate-800/60",
   btn: "px-3 py-2 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-indigo-500",
   btnPrimary: "bg-indigo-600 hover:bg-indigo-700 text-white",
@@ -45,11 +46,18 @@ export default function InventoryPage() {
   const [confirmTarget, setConfirmTarget] = useState(null);
 
   const hasFilter = useMemo(() => !!q || !!category, [q, category]);
+  const [supplierId, setSupplierId] = useState("");
 
   async function load() {
     setLoading(true);
     setError("");
     try {
+      const suppliersData = await listSuppliers();
+      suppliersData
+        .filter((s) => s.isShop)
+        .map((item) => {
+          setSupplierId(item._id);
+        });
       const { data } = await API.get("/inventory", {
         params: { ...(q ? { q } : {}), ...(category ? { category } : {}) },
       });
@@ -378,6 +386,7 @@ export default function InventoryPage() {
       {/* مودال إنشاء/تعديل الصنف */}
       <ItemFormModal
         open={modalOpen}
+        supplierId={supplierId}
         onClose={() => setModalOpen(false)}
         initial={editTarget}
         onSaved={(saved) => {
@@ -463,7 +472,7 @@ function InfoRow({ k, v, className = "" }) {
 }
 
 /** مودال إنشاء/تعديل صنف */
-function ItemFormModal({ open, onClose, initial, onSaved }) {
+function ItemFormModal({ open, onClose, initial, onSaved, supplierId }) {
   const isEdit = !!initial?._id;
 
   const [name, setName] = useState("");
@@ -472,7 +481,6 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
   const [unitCost, setUnitCost] = useState("");
   const [stock, setStock] = useState("");
   const [minStock, setMinStock] = useState("");
-  const [supplierId, setSupplierId] = useState("");
   const [notes, setNotes] = useState("");
 
   const [saving, setSaving] = useState(false);
@@ -486,7 +494,6 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
       setUnitCost(numOrEmpty(initial.unitCost));
       setStock(numOrEmpty(initial.stock));
       setMinStock(numOrEmpty(initial.minStock));
-      setSupplierId(initial?.supplier?._id || initial?.supplierId || "");
       setNotes(initial.notes || "");
     } else {
       setName("");
@@ -495,7 +502,6 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
       setUnitCost("");
       setStock("");
       setMinStock("");
-      setSupplierId("");
       setNotes("");
     }
   }, [open, isEdit, initial]);
@@ -606,13 +612,6 @@ function ItemFormModal({ open, onClose, initial, onSaved }) {
               value={minStock}
               onChange={(e) => setMinStock(e.target.value)}
               placeholder="0"
-            />
-          </Field>
-
-          <Field label="المورد (اختياري)">
-            <SupplierSelect
-              value={supplierId}
-              onChange={(id) => setSupplierId(id)}
             />
           </Field>
 

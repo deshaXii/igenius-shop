@@ -43,7 +43,9 @@ export default function App() {
       {/* صفحات محمية */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
+
           <Route path="/settings/departments" element={<DepartmentsPage />} />
+          
           <Route index element={<Navigate to="/repairs" replace />} />
           <Route path="/repairs" element={<RepairsPage />} />
           <Route path="/repairs/new" element={<NewRepairPage />} />

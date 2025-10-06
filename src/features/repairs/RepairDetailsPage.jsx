@@ -529,7 +529,7 @@ export default function SingleRepairPage() {
             value={info.currentDepartment?.name || "—"}
           />
           <Info label="تاريخ الإنشاء" value={formatDate(repair.createdAt)} />
-          {/* <Info label="الفني" value={repair?.technician?.name || "—"} /> */}
+          <Info label="المستلم" value={repair?.createdBy?.name || "—"} />ff
         </div>
       </section>
 

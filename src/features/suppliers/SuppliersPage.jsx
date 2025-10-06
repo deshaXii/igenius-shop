@@ -71,6 +71,27 @@ export default function SuppliersPage() {
     }
   }
 
+  async function deleteSupplier(id) {
+    if (!canManage) return alert("ليست لديك صلاحيات حذف مورد");
+    if (!id) return;
+    if (!window.confirm("هل أنت متأكد من حذف هذا المورد؟")) return;
+    try {
+      setSaving(true);
+      await fetch(`http://localhost:5000/api/suppliers/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      await load();
+    } catch (e) {
+      alert(e?.response?.data?.message || "تعذّر حذف المورد");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
       {/* هيدر أنيق */}
@@ -156,7 +177,7 @@ export default function SuppliersPage() {
                 <Th>الاسم</Th>
                 <Th>الهاتف</Th>
                 <Th>النوع</Th>
-                <Th>فتح</Th>
+                <Th>اجراءات</Th>
               </tr>
             </thead>
             <tbody>
@@ -204,12 +225,20 @@ export default function SuppliersPage() {
                       </span>
                     </Td>
                     <Td>
-                      <Link
+                      {/* <Link
                         to={`/suppliers/${s._id}`}
-                        className={`${UI.btn} ${UI.btnGhost}`}
+                        className={`${UI.btn} ${UI.btnGhost}  inline-block`}
                       >
                         فتح
-                      </Link>
+                      </Link> */}
+                      {!s.isShop && (
+                        <button
+                          onClick={() => deleteSupplier(s._id)}
+                          className={`${UI.btn} ${UI.btnGhost} mx-2 inline-block`}
+                        >
+                          حذف
+                        </button>
+                      )}
                     </Td>
                   </tr>
                 ))
@@ -283,7 +312,7 @@ function Th({ children }) {
   );
 }
 function Td({ children, className = "" }) {
-  return <td className={`p-3 align-middle ${className}`}>{children}</td>;
+  return <td className={`p-2 align-middle ${className}`}>{children}</td>;
 }
 function SkeletonRow() {
   return (

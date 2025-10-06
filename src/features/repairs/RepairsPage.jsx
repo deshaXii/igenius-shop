@@ -712,8 +712,8 @@ export default function RepairsPage() {
                   value={q}
                   onChange={(e) => setQ(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && load()}
-                  placeholder="بحث (اسم/هاتف/جهاز/عطل)"
-                  className={UI.input}
+                  placeholder="بحث (اسم/هاتف/رقم الهاتف/جهاز/عطل)"
+                  className={`${UI.input} h-full`}
                   aria-label="بحث"
                 />
               </div>
