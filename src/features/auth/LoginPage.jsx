@@ -22,7 +22,8 @@ const LoginPage = () => {
   useEffect(() => {
     try {
       const rememberFlag = localStorage.getItem("rememberMe");
-      const rememberedUsername = localStorage.getItem("rememberedUsername") || "";
+      const rememberedUsername =
+        localStorage.getItem("rememberedUsername") || "";
       if (rememberFlag === "1") {
         setRemember(true);
         if (rememberedUsername) setUsername(rememberedUsername);
@@ -43,7 +44,7 @@ const LoginPage = () => {
         password,
       };
       const { data } = await axios.post(
-        "http://localhost:5000/api/auth/login",
+        "https://igenius-shop-api.vercel.app/api/auth/login",
         payload
       );
 
@@ -138,7 +139,9 @@ const LoginPage = () => {
                 <button
                   type="button"
                   onClick={() => setShowPwd((s) => !s)}
-                  aria-label={showPwd ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"}
+                  aria-label={
+                    showPwd ? "إخفاء كلمة المرور" : "إظهار كلمة المرور"
+                  }
                   className="absolute left-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {showPwd ? (
