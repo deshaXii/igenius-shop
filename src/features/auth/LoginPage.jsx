@@ -44,7 +44,7 @@ const LoginPage = () => {
         password,
       };
       const { data } = await axios.post(
-        "https://igenius-shop-api.vercel.app/api/auth/login",
+        "http://localhost:5000/api/auth/login",
         payload
       );
 
@@ -90,7 +90,7 @@ const LoginPage = () => {
             <h1 className="text-2xl font-bold mt-3 text-gray-900 dark:text-white">
               تسجيل الدخول
             </h1>
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-sm text-[16px] text-gray-500 dark:text-gray-400 mt-1">
               ادخل بيانات حسابك للمتابعة
             </p>
           </div>
@@ -101,7 +101,7 @@ const LoginPage = () => {
 
             {/* Username */}
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="block mb-1 text-sm text-[16px] font-medium text-gray-700 dark:text-gray-300">
                 اسم المستخدم أو البريد
               </label>
               <div className="relative">
@@ -122,7 +122,7 @@ const LoginPage = () => {
 
             {/* Password */}
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-700 dark:text-gray-300">
+              <label className="block mb-1 text-sm text-[16px] font-medium text-gray-700 dark:text-gray-300">
                 كلمة المرور
               </label>
               <div className="relative">
@@ -167,7 +167,7 @@ const LoginPage = () => {
 
             {/* Remember me + submit */}
             <div className="flex items-center justify-between">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 select-none">
+              <label className="inline-flex items-center gap-2 text-sm text-[16px] text-gray-700 dark:text-gray-300 select-none">
                 <input
                   type="checkbox"
                   checked={remember}

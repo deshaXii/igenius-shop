@@ -10,212 +10,41 @@ import {
 import formatDate from "../../utils/formatDate";
 import useAuthStore from "../auth/authStore";
 import DeliveryModal from "../../components/DeliveryModal";
-
-/* ========= Helpers ========= */
-function toNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-function includeNumberField(obj, key, val) {
-  if (val === "" || val === null || val === undefined) return obj;
-  const n = Number(val);
-  return Number.isFinite(n) ? { ...obj, [key]: n } : obj;
-}
-function hasNum(v) {
-  if (v === "" || v === null || v === undefined) return false;
-  const n = Number(v);
-  return Number.isFinite(n);
-}
-
-/* UI Presets */
-const UI = {
-  card: "bg-white/90 dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 rounded-2xl",
-  input: "px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 w-full",
-  btn: "px-3 py-2 rounded-xl transition focus:outline-none focus:ring-2 focus:ring-indigo-500",
-  btnPrimary: "bg-indigo-600 hover:bg-indigo-700 text-white",
-  btnGhost:
-    "border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800",
-  pill: "px-2 py-0.5 rounded-full text-xs font-medium",
-};
-
-const SHORT_STATUS = ["مكتمل", "تم التسليم", "مرفوض"];
-
-// ======== بيانات المحل ========
-const SHOP = {
-  name: "IGenius",
-  phone: "01000000000",
-  address: "القاهرة — شارع المثال، عمارة 10",
-  footer: "شكراً لاختياركم خدماتنا.",
-  warrantyNote:
-    "الضمان يشمل العطل المُصلّح فقط ولا يشمل سوء الاستخدام أو الكسر أو السوائل.",
-};
-
-// ======== Helpers ========
-function getTrackingUrl(rep) {
-  const token = rep?.publicTracking?.token;
-  return token ? `${window.location.origin}/t/${token}` : "";
-}
-function inRange(dateISO, startStr, endStr) {
-  if (!dateISO || !startStr || !endStr) return false;
-  const d = new Date(dateISO);
-  const start = new Date(`${startStr}T00:00:00`);
-  const end = new Date(`${endStr}T23:59:59.999`);
-  return d >= start && d <= end;
-}
-function isOldRepair(r, quick, startStr, endStr) {
-  if (quick === "all" || !startStr || !endStr) return false;
-  const deliveredIn = inRange(r.deliveryDate, startStr, endStr);
-  const createdIn = inRange(r.createdAt, startStr, endStr);
-  return deliveredIn && !createdIn;
-}
-function ymdLocal(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-// ======== طباعة إيصال الضمان ========
-function handlePrintReceipt(rep) {
-  if (!rep) return;
-  const win = window.open("", "_blank", "width=800,height=900");
-  const warrantyTxt =
-    rep?.hasWarranty && rep?.warrantyEnd
-      ? `ضمان حتى: ${formatDate(rep.warrantyEnd)}`
-      : "— لا يوجد تاريخ ضمان محدد —";
-
-  const html = `
-<!doctype html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="utf-8"/>
-<title>إيصال ضمان — #${rep.repairId ?? "-"}</title>
-<style>
-  body{font-family:Tahoma,Arial,sans-serif; margin:24px; color:#111;}
-  .hdr{display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:16px;}
-  .shop h1{margin:0; font-size:20px}
-  .shop div{font-size:12px; opacity:.8}
-  .meta{font-size:12px; text-align:left}
-  h2{font-size:16px; margin:16px 0 8px}
-  table{width:100%; border-collapse:collapse}
-  th,td{border:1px solid #ddd; padding:8px; font-size:13px}
-  .note{margin-top:12px; font-size:12px; opacity:.8}
-  .footer{margin-top:18px; font-size:12px; text-align:center}
-  .badge{display:inline-block; padding:2px 8px; border-radius:8px; background:#f5f5f5; font-size:12px}
-</style>
-</head>
-<body>
-  <div class="hdr">
-    <div class="shop">
-      <h1>${SHOP.name}</h1>
-      <div>الهاتف: ${SHOP.phone}</div>
-      <div>العنوان: ${SHOP.address}</div>
-    </div>
-    <div class="meta">
-      <div>رقم الصيانة: #${rep.repairId ?? "-"}</div>
-      <div>التاريخ: ${formatDate(new Date().toISOString())}</div>
-      <div class="badge">${rep.status || ""}</div>
-    </div>
-  </div>
-
-  <h2>بيانات العميل</h2>
-  <table>
-    <tr><th>الاسم</th><td>${rep.customerName || "—"}</td></tr>
-    <tr><th>الهاتف</th><td>${rep.phone || "—"}</td></tr>
-  </table>
-
-  <h2>بيانات الجهاز</h2>
-  <table>
-    <tr><th>النوع</th><td>${rep.deviceType || "—"}</td></tr>
-    <tr><th>اللون</th><td>${rep.color || "—"}</td></tr>
-    <tr><th>العطل</th><td>${rep.issue || "—"}</td></tr>
-    <tr><th>السعر المتفق عليه</th><td>${
-      hasNum(rep.price) ? Number(rep.price) : "—"
-    }</td></tr>
-    <tr><th>السعر النهائي</th><td>${
-      hasNum(rep.finalPrice)
-        ? Number(rep.finalPrice)
-        : hasNum(rep.price)
-        ? Number(rep.price)
-        : "—"
-    }</td></tr>
-    <tr><th>الضمان</th><td>${warrantyTxt}</td></tr>
-  </table>
-
-  <div class="note"><strong>ملاحظات الضمان:</strong> ${SHOP.warrantyNote}</div>
-  <div class="footer">${SHOP.footer}</div>
-
-  <script>window.onload = () => window.print();</script>
-</body>
-</html>`;
-  win.document.open();
-  win.document.write(html);
-  win.document.close();
-}
-
-// ======== رسالة واتساب ========
-function handleWhatsAppMessage(rep) {
-  if (!rep?.phone) {
-    alert("لا يوجد رقم هاتف للعميل.");
-    return;
-  }
-  const digits = String(rep.phone).replace(/\D+/g, "");
-  const normalized = digits.replace(/^0+/, "");
-  const phoneE164 = `20${normalized}`;
-
-  const partsSummary = (rep.parts || [])
-    .map(
-      (p) =>
-        `- ${p.name || "قطعة"}${
-          Number.isFinite(p.cost) ? ` (${Math.round(p.cost)}ج)` : ""
-        }`
-    )
-    .join("%0A");
-
-  const warrantyLine =
-    rep?.hasWarranty && rep?.warrantyEnd
-      ? `الضمان حتى ${formatDate(rep.warrantyEnd)}`
-      : "بدون تاريخ ضمان محدد";
-
-  const track = getTrackingUrl(rep);
-
-  const msg = [
-    `أهلاً ${rep.customerName || "عميلنا الكريم"} 👋`,
-    `يسعدنا إبلاغك أن جهازك (${rep.deviceType || "الجهاز"}) أصبح ${
-      rep.status === "تم التسليم" ? "جاهزًا وتم تسليمه" : "جاهزًا"
-    } ✅`,
-    `العطل: ${rep.issue || "—"}`,
-    `السعر النهائي: ${
-      hasNum(rep.finalPrice)
-        ? Number(rep.finalPrice)
-        : hasNum(rep.price)
-        ? Number(rep.price)
-        : "—"
-    } جنيه`,
-    `القطع المستخدمة:%0A${partsSummary || "- لا توجد قطع"}`,
-    `الضمان: ${warrantyLine}`,
-    track ? `رابط تتبّع/تفاصيل الصيانة: ${track}` : null,
-    "",
-    "نطمح لمعرفة مدى رضاك عن الخدمة. لو عندك أي ملاحظات أو احتجت مساعدة احنا موجودين دايمًا 🌟",
-    SHOP.name,
-  ]
-    .filter(Boolean)
-    .join("%0A");
-
-  const url = `https://wa.me/${phoneE164}?text=${msg}`;
-  window.open(url, "_blank");
-}
+import WarrantyBadge from "../../components/WarrantyBadge";
+import { SHORT_STATUS } from "../../utils/data";
+import { UI } from "../../utils/ui";
+import YmdLocal from "../../components/helpers/ymdLocal";
+import IsOldRepair from "../../components/helpers/isOldRepair";
+import hasNum from "../../components/helpers/hasNum";
+import HandleWhatsAppMessage from "../../components/helpers/handleWhatsAppMessage";
+import IncludeNumberField from "../../components/helpers/IncludeNumberField";
+import HandlePrintReceipt from "../../components/helpers/HandlePrintReceipt";
+import AfterCompleteModal from "../../components/AfterCompleteModal";
 
 export default function RepairsPage() {
-  /* Bottom Sheet state بدلاً من DOM refs */
+  const { user } = useAuthStore();
+  const navigation = useNavigate();
   const [filtersOpen, setFiltersOpen] = useState(false);
-
   const [afterCompleteOpen, setAfterCompleteOpen] = useState(false);
   const [afterCompleteTarget, setAfterCompleteTarget] = useState(null);
-
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
   const [warrantyEnd, setWarrantyEnd] = useState("");
   const [warrantyTarget, setWarrantyTarget] = useState(null);
+  const [quick, setQuick] = useState("today"); // today | yesterday | all | custom
+  const [q, setQ] = useState("");
+  const [status, setStatus] = useState("");
+  const [technician, setTechnician] = useState("");
+  const todayStr = useMemo(() => YmdLocal(new Date()), []);
+  const [startDate, setStartDate] = useState(todayStr);
+  const [endDate, setEndDate] = useState(todayStr);
+  const [techs, setTechs] = useState([]);
+  const [deps, setDeps] = useState([]);
+  const [list, setList] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [deliverOpen, setDeliverOpen] = useState(false);
+  const [deliverTarget, setDeliverTarget] = useState(null);
+  const [deliverRequirePassword, setDeliverRequirePassword] = useState(false);
 
   useEffect(() => {
     const h = () => load();
@@ -248,8 +77,6 @@ export default function RepairsPage() {
     return () => window.removeEventListener("repairs:update-one", onUpdateOne);
   }, []);
 
-  const { user } = useAuthStore();
-  const navigation = useNavigate();
   useEffect(() => {
     if (!user) {
       navigation(0);
@@ -274,36 +101,17 @@ export default function RepairsPage() {
 
   const canUseRepairFilters = isAdmin || user?.permissions?.editRepair;
 
-  const todayStr = useMemo(() => ymdLocal(new Date()), []);
   const yesterdayStr = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() - 1);
-    return ymdLocal(d);
+    return YmdLocal(d);
   }, []);
 
-  const [quick, setQuick] = useState("today"); // today | yesterday | all | custom
-  const [q, setQ] = useState("");
-  const [status, setStatus] = useState("");
-  const [technician, setTechnician] = useState("");
-  const [startDate, setStartDate] = useState(todayStr);
-  const [endDate, setEndDate] = useState(todayStr);
-  const [techs, setTechs] = useState([]);
-  const [deps, setDeps] = useState([]);
   const depMap = useMemo(() => {
     const m = new Map();
     for (const d of deps) m.set(String(d._id), d.name);
     return m;
   }, [deps]);
-
-  const [list, setList] = useState([]);
-  const [loading, setLoading] = useState(false);
-
-  const [deletingId, setDeletingId] = useState(null);
-
-  // Modal (تسليم)
-  const [deliverOpen, setDeliverOpen] = useState(false);
-  const [deliverTarget, setDeliverTarget] = useState(null);
-  const [deliverRequirePassword, setDeliverRequirePassword] = useState(false);
 
   const [error, setError] = useState("");
 
@@ -391,8 +199,8 @@ export default function RepairsPage() {
         parts,
         ...(payload.password ? { password: payload.password } : {}),
       };
-      body = includeNumberField(body, "finalPrice", payload.finalPrice);
-      body = includeNumberField(body, "price", payload.price);
+      body = IncludeNumberField(body, "finalPrice", payload.finalPrice);
+      body = IncludeNumberField(body, "price", payload.price);
 
       const updated = await updateRepair(deliverTarget._id, body);
 
@@ -763,12 +571,12 @@ export default function RepairsPage() {
         className={`${UI.card} p-0 shadow-sm overflow-hidden hidden md:block`}
       >
         <div className="flex items-center justify-between px-4 pt-3">
-          <div className="text-sm opacity-70">
+          <div className="text-sm text-[16px] opacity-70">
             النتائج: {loading ? "…" : list.length}
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-separate [border-spacing:0]">
+          <table className="w-full text-sm text-[16px] border-separate [border-spacing:0]">
             <thead className="sticky top-0 bg-white/95 dark:bg-gray-900/95 shadow-sm">
               <tr className="text-right">
                 <Th>#</Th>
@@ -800,7 +608,7 @@ export default function RepairsPage() {
                 </tr>
               ) : (
                 list.map((r) => {
-                  const old = isOldRepair(r, quick, startDate, endDate);
+                  const old = IsOldRepair(r, quick, startDate, endDate);
                   const basePrice = hasNum(r.price) ? Number(r.price) : null;
                   const finalPrice = hasNum(r.finalPrice)
                     ? Number(r.finalPrice)
@@ -966,7 +774,7 @@ export default function RepairsPage() {
                   <StatusPill s={r.status} />
                 </div>
 
-                <div className="text-sm opacity-80">
+                <div className="text-sm text-[16px] opacity-80">
                   {r.customerName} • {r.phone || "—"}
                 </div>
                 <div className="text-xs opacity-70 mt-1">
@@ -1160,64 +968,10 @@ export default function RepairsPage() {
         <AfterCompleteModal
           open={afterCompleteOpen}
           onClose={() => setAfterCompleteOpen(false)}
-          onPrint={() => handlePrintReceipt(afterCompleteTarget)}
-          onWhatsApp={() => handleWhatsAppMessage(afterCompleteTarget)}
+          onPrint={() => HandlePrintReceipt(afterCompleteTarget)}
+          onWhatsApp={() => HandleWhatsAppMessage(afterCompleteTarget)}
         />
       )}
-    </div>
-  );
-}
-
-// ======== شارة الضمان ========
-function WarrantyBadge({ until }) {
-  return (
-    <span
-      title={until ? `ضمان حتى ${formatDate(until)}` : "ضمان"}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-amber-100 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200"
-    >
-      <svg
-        viewBox="0 0 24 24"
-        className="w-3 h-3"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M12 2l7 4v6c0 5-3.5 9-7 10-3.5-1-7-5-7-10V6l7-4zM8 11l2 2 4-4 1.5 1.5L10 15l-3.5-3.5L8 11z" />
-      </svg>
-      ضمان
-    </span>
-  );
-}
-
-// ======== AfterCompleteModal ========
-function AfterCompleteModal({ open, onClose, onPrint, onWhatsApp }) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
-      <div className="bg-white dark:bg-gray-800 w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
-        <h3 className="text-lg font-semibold">تم إنهاء العملية</h3>
-        <p className="text-sm opacity-80">
-          هل تودّ طباعة إيصال الضمان أو مراسلة العميل على واتساب؟
-        </p>
-        <div className="grid sm:grid-cols-2 gap-2">
-          <button
-            className={`${UI.btn} bg-emerald-600 hover:bg-emerald-700 text-white`}
-            onClick={() => onPrint?.()}
-          >
-            طباعة إيصال الضمان
-          </button>
-          <button
-            className={`${UI.btn} bg-green-600 hover:bg-green-700 text-white`}
-            onClick={() => onWhatsApp?.()}
-          >
-            إرسال رسالة واتساب
-          </button>
-        </div>
-        <div className="flex justify-end">
-          <button className={`${UI.btn} ${UI.btnGhost}`} onClick={onClose}>
-            إغلاق
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

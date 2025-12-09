@@ -245,10 +245,10 @@ export default function SupplierDetailsPage() {
 
       {/* Desktop table */}
       <section className="hidden md:block p-3 rounded-2xl bg-white dark:bg-gray-800 shadow-sm overflow-x-auto">
-        <div className="text-sm opacity-70 mb-2">
+        <div className="text-sm text-[16px] opacity-70 mb-2">
           النتائج: {loading ? "…" : rows.length}
         </div>
-        <table className="w-full text-sm border-separate [border-spacing:0]">
+        <table className="w-full text-sm text-[16px] border-separate [border-spacing:0]">
           <thead className="sticky top-[72px] bg-white dark:bg-gray-800 shadow-sm">
             <tr className="text-right">
               <Th>اسم القطعة</Th>

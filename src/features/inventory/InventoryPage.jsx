@@ -182,7 +182,7 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="text-sm opacity-70">
+        <div className="text-sm text-[16px] opacity-70">
           النتائج: {loading ? "…" : list.length}
         </div>
       </section>
@@ -195,7 +195,7 @@ export default function InventoryPage() {
       <section className={`${UI.card} p-0 overflow-hidden`}>
         {/* Desktop Table */}
         <div className="hidden md:block overflow-x-auto">
-          <table className="w-full text-sm border-separate [border-spacing:0]">
+          <table className="w-full text-sm text-[16px] border-separate [border-spacing:0]">
             <thead className="sticky top-0 bg-white/95 dark:bg-gray-900/95 shadow-sm">
               <tr className="text-right">
                 <Th>الاسم</Th>
@@ -464,7 +464,7 @@ function CardSkeleton() {
 }
 function InfoRow({ k, v, className = "" }) {
   return (
-    <div className={`text-sm ${className}`}>
+    <div className={`text-sm text-[16px] ${className}`}>
       <div className="text-[11px] opacity-60">{k}</div>
       <div className="font-medium break-words">{v}</div>
     </div>
@@ -680,7 +680,7 @@ function ConfirmDialog({
 function Field({ label, children }) {
   return (
     <label className="space-y-1">
-      <div className="text-sm opacity-80">{label}</div>
+      <div className="text-sm text-[16px] opacity-80">{label}</div>
       {children}
     </label>
   );

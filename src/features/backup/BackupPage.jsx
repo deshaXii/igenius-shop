@@ -256,7 +256,7 @@ export default function BackupPage() {
             </div>
 
             {data.latestFile && data.latestFileSizeMB != null && (
-              <div className="text-sm opacity-80">
+              <div className="text-sm text-[16px] opacity-80">
                 (آخر ملف مسجّل: <b>{data.latestFile}</b> —{" "}
                 {mb(data.latestFileSizeMB)})
               </div>

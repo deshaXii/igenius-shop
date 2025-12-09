@@ -151,7 +151,7 @@ export default function NotificationsPage() {
           </span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-sm px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800">
+          <label className="flex items-center gap-2 text-sm text-[16px] px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800">
             <input
               type="checkbox"
               className="h-4 w-4 accent-blue-600"

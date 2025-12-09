@@ -576,7 +576,7 @@ function TransactionsBlock({ startDate, endDate }) {
                     >
                       {isIn ? "داخل" : "خارج"}
                     </span>
-                    <span className="text-sm font-semibold">
+                    <span className="text-sm text-[16px] font-semibold">
                       {egp(t.amount)}
                     </span>
                   </div>
@@ -588,7 +588,7 @@ function TransactionsBlock({ startDate, endDate }) {
                   )}
                   <div className="absolute bottom-[10px] left-[10px]">
                     <button
-                      className="px-3 py-1.5 rounded bg-red-600 text-white text-sm disabled:opacity-60"
+                      className="px-3 py-1.5 rounded bg-red-600 text-white text-sm text-[16px] disabled:opacity-60"
                       onClick={() => remove(t._id)}
                       disabled={removing === t._id}
                     >
@@ -714,7 +714,7 @@ function KpiCard({
         className
       )}
     >
-      <div className="text-sm opacity-70">{title}</div>
+      <div className="text-sm text-[16px] opacity-70">{title}</div>
       <div
         className={cls(
           "text-2xl font-bold mt-1",

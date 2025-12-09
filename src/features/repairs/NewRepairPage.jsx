@@ -608,7 +608,7 @@ export default function NewRepairPage() {
 function Field({ label, children }) {
   return (
     <label className="space-y-1">
-      <div className="text-sm opacity-80">{label}</div>
+      <div className="text-sm text-[16px] opacity-80">{label}</div>
       {children}
     </label>
   );

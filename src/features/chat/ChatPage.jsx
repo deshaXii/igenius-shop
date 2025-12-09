@@ -183,7 +183,7 @@ export default function ChatPage() {
           <div className="mx-auto -mt-6 mb-2">
             <button
               onClick={scrollToBottom}
-              className="px-3 py-1.5 rounded-full bg-blue-600 text-white text-sm shadow"
+              className="px-3 py-1.5 rounded-full bg-blue-600 text-white text-sm text-[16px] shadow"
             >
               رسائل جديدة — اضغط للانتقال للأسفل
             </button>
@@ -231,7 +231,7 @@ export default function ChatPage() {
             type="search"
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm mb-2"
+            className="w-full px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-800 text-sm text-[16px] mb-2"
             placeholder="بحث عن فني…"
             aria-label="بحث عن فني"
           />
@@ -256,7 +256,7 @@ export default function ChatPage() {
                 </li>
               ))}
               {!filteredTechs.length && (
-                <li className="opacity-70 text-sm py-2 text-center">
+                <li className="opacity-70 text-sm text-[16px] py-2 text-center">
                   لا نتائج
                 </li>
               )}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import useAuthStore from "../auth/authStore";
 import {
@@ -11,69 +11,32 @@ import {
 import API, { RepairsAPI, DepartmentsAPI } from "../../lib/api";
 import QrAfterCreateModal from "../../components/QrAfterCreateModal";
 import DeliveryModal from "../../components/DeliveryModal";
-
-/* ========= Theme / Palette ========= */
-const PALETTE = {
-  card: "bg-white/90 dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 backdrop-blur",
-  subtle: "bg-slate-50 dark:bg-slate-800/70",
-  primary:
-    "bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 text-white",
-  outline:
-    "border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800",
-  danger: "bg-rose-600 hover:bg-rose-700 text-white",
-  ok: "bg-emerald-600 hover:bg-emerald-700 text-white",
-  grayBtn: "bg-gray-200 dark:bg-gray-700",
-};
-
-/* ========= Helpers ========= */
-function toNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-function numOrDash(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : "—";
-}
-function priceDisplay(finalPrice, price) {
-  const fn = Number(finalPrice);
-  if (Number.isFinite(fn)) return fn;
-  const pn = Number(price);
-  return Number.isFinite(pn) ? pn : "—";
-}
-
-const STATUS_SELECT = ["مكتمل", "تم التسليم", "مرفوض"];
-
-const SHOP = {
-  name: "IGenius",
-  phone: "01000000000",
-  address: "القاهرة — شارع المثال، عمارة 10",
-  footer: "شكراً لاختياركم خدماتنا.",
-  warrantyNote:
-    "الضمان يشمل العطل المُصلّح فقط ولا يشمل سوء الاستخدام أو الكسر أو السوائل.",
-};
+import { SHORT_STATUS, STATUS_AR, TYPE_AR } from "../../utils/data";
+import toNum from "../../components/helpers/toNum";
+import numOrDash from "../../components/helpers/numOrDash";
+import AfterCompleteModal from "../../components/AfterCompleteModal";
+import { PALETTE, TYPE_STYLE } from "../../utils/ui";
+import handlePrintReceipt from "../../components/helpers/handlePrintReceipt";
+import handleWhatsAppMessage from "../../components/helpers/handleWhatsAppMessage";
+import LogRow from "../../components/LogRow";
+import { describeLog } from "../../components/helpers/describeLog";
 
 export default function SingleRepairPage() {
   const { id } = useParams();
-  const nav = useNavigate();
   const { user } = useAuthStore();
-
   const isAdmin = user?.role === "admin" || user?.permissions?.adminOverride;
   const canEditAll = isAdmin || user?.permissions?.editRepair;
 
   const [loading, setLoading] = useState(true);
-  const [savingBtn, setSavingBtn] = useState(false);
-
+  const [setSavingBtn] = useState(false);
   const [repair, setRepair] = useState(null);
-
   const [qrOpen, setQrOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [requirePassword, setRequirePassword] = useState(false);
-
   const [afterCompleteOpen, setAfterCompleteOpen] = useState(false);
   const [warrantyEnd, setWarrantyEnd] = useState("");
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
 
-  // التايملاين / الأقسام / الفنيين للخطوة الحالية
   const [info, setInfo] = useState({
     currentDepartment: null,
     flows: [],
@@ -92,7 +55,6 @@ export default function SingleRepairPage() {
   const [stepPrice, setStepPrice] = useState("");
   const [stepNotes, setStepNotes] = useState("");
 
-  // إرسال تحديثات للعميل
   const [cuType, setCuType] = useState("text");
   const [cuText, setCuText] = useState("");
   const [cuFileUrl, setCuFileUrl] = useState("");
@@ -283,122 +245,6 @@ export default function SingleRepairPage() {
     }
   }
 
-  function handlePrintReceipt() {
-    if (!repair) return;
-    const win = window.open("", "_blank", "width=800,height=900");
-    const warrantyTxt =
-      repair?.hasWarranty && repair?.warrantyEnd
-        ? `ضمان حتى: ${formatDate(repair.warrantyEnd)}`
-        : "— لا يوجد تاريخ ضمان محدد —";
-
-    const html = `
-<!doctype html>
-<html dir="rtl" lang="ar">
-<head>
-<meta charset="utf-8"/>
-<title>إيصال ضمان — #${repair.repairId ?? "-"}</title>
-<style>
-  body{font-family:Tahoma,Arial,sans-serif; margin:24px; color:#111;}
-  .hdr{display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #000; padding-bottom:10px; margin-bottom:16px;}
-  .shop h1{margin:0; font-size:20px}
-  .shop div{font-size:12px; opacity:.8}
-  .meta{font-size:12px; text-align:left}
-  h2{font-size:16px; margin:16px 0 8px}
-  table{width:100%; border-collapse:collapse}
-  th,td{border:1px solid #ddd; padding:8px; font-size:13px}
-  .note{margin-top:12px; font-size:12px; opacity:.8}
-  .footer{margin-top:18px; font-size:12px; text-align:center}
-  .badge{display:inline-block; padding:2px 8px; border-radius:8px; background:#f5f5f5; font-size:12px}
-</style>
-</head>
-<body>
-  <div class="hdr">
-    <div class="shop">
-      <h1>${SHOP.name}</h1>
-      <div>الهاتف: ${SHOP.phone}</div>
-      <div>العنوان: ${SHOP.address}</div>
-    </div>
-    <div class="meta">
-      <div>رقم الصيانة: #${repair.repairId ?? "-"}</div>
-      <div>التاريخ: ${formatDate(new Date().toISOString())}</div>
-      <div class="badge">${repair.status || ""}</div>
-    </div>
-  </div>
-
-  <h2>بيانات العميل</h2>
-  <table>
-    <tr><th>الاسم</th><td>${repair.customerName || "—"}</td></tr>
-    <tr><th>الهاتف</th><td>${repair.phone || "—"}</td></tr>
-  </table>
-
-  <h2>بيانات الجهاز</h2>
-  <table>
-    <tr><th>النوع</th><td>${repair.deviceType || "—"}</td></tr>
-    <tr><th>اللون</th><td>${repair.color || "—"}</td></tr>
-    <tr><th>العطل</th><td>${repair.issue || "—"}</td></tr>
-    <tr><th>السعر النهائي</th><td>${priceDisplay(
-      repair.finalPrice,
-      repair.price
-    )}</td></tr>
-    <tr><th>الضمان</th><td>${warrantyTxt}</td></tr>
-  </table>
-
-  <div class="note">
-    <strong>ملاحظات الضمان:</strong> ${SHOP.warrantyNote}
-  </div>
-  <div class="footer">${SHOP.footer}</div>
-
-  <script>window.onload = () => window.print();</script>
-</body>
-</html>`;
-    win.document.open();
-    win.document.write(html);
-    win.document.close();
-  }
-
-  function handleWhatsAppMessage() {
-    if (!repair?.phone) {
-      alert("لا يوجد رقم هاتف للعميل.");
-      return;
-    }
-    const digits = String(repair.phone).replace(/\D+/g, "");
-    const normalized = digits.replace(/^0+/, "");
-    const phoneE164 = `20${normalized}`;
-
-    const partsSummary = (repair.parts || [])
-      .map((p) => {
-        const c = Number(p.cost);
-        const cTxt = Number.isFinite(c) ? ` (${Math.round(c)}ج)` : "";
-        return `- ${p.name || "قطعة"}${cTxt}`;
-      })
-      .join("\n");
-
-    const warrantyLine =
-      repair?.hasWarranty && repair?.warrantyEnd
-        ? `الضمان حتى ${formatDate(repair.warrantyEnd)}`
-        : "بدون تاريخ ضمان محدد";
-
-    const msg = [
-      `أهلاً ${repair.customerName || "عميلنا الكريم"} 👋`,
-      `يسعدنا إبلاغك أن جهازك (${repair.deviceType || "الجهاز"}) أصبح ${
-        repair.status === "تم التسليم" ? "جاهزًا وتم تسليمه" : "جاهزًا"
-      } ✅`,
-      `العطل: ${repair.issue || "—"}`,
-      `السعر النهائي: ${priceDisplay(repair.finalPrice, repair.price)} جنيه`,
-      `القطع المستخدمة:\n${partsSummary || "- لا توجد قطع"}`,
-      `الضمان: ${warrantyLine}`,
-      trackingUrl ? `رابط تتبّع/تفاصيل الصيانة: ${trackingUrl}` : null,
-      "",
-      "نطمح لمعرفة مدى رضاك عن الخدمة. لو عندك أي ملاحظات أو احتجت مساعدة احنا موجودين دايمًا 🌟",
-      SHOP.name,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const url = `https://wa.me/${phoneE164}?text=${encodeURIComponent(msg)}`;
-    window.open(url, "_blank");
-  }
-
   if (loading) return <div>جارِ التحميل...</div>;
   if (error)
     return <div className="p-3 rounded-xl bg-red-50 text-red-800">{error}</div>;
@@ -406,6 +252,7 @@ export default function SingleRepairPage() {
 
   const cur = info.flows?.length ? info.flows[info.flows.length - 1] : null;
   const isCurrentCompleted = cur && cur.status === "completed";
+
   // fallback لو PALETTE مش متعرّف
   const CARD =
     (typeof PALETTE !== "undefined" && PALETTE.card) ||
@@ -414,23 +261,10 @@ export default function SingleRepairPage() {
     (typeof PALETTE !== "undefined" && PALETTE.subtle) ||
     "bg-slate-50 dark:bg-slate-800/60";
 
-  // ألوان الشارات حسب النوع
-  const TYPE_STYLE = {
-    create:
-      "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200",
-    update: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-200",
-    status_change:
-      "bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-200",
-    assign_technician:
-      "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
-    flow_complete:
-      "bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-200",
-    move_next:
-      "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200",
-    delete: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
-  };
+  const parts = repair.parts || [];
+  const logsCount = (info.logs || []).length;
+  const stepsCount = (info.flows || []).length;
 
-  const count = (info.logs || []).length;
   return (
     <div className="space-y-6">
       {/* ===== Gradient Header ===== */}
@@ -484,7 +318,7 @@ export default function SingleRepairPage() {
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <div className="grid md:grid-cols-4 gap-3 items-end">
           <div>
-            <div className="text-sm opacity-80 mb-1">الحالة</div>
+            <div className="text-sm text-[16px] opacity-80 mb-1">الحالة</div>
             <select
               value={repair.status || ""}
               onChange={(e) => handleStatusPick(e.target.value)}
@@ -492,7 +326,7 @@ export default function SingleRepairPage() {
               className="px-3 py-2 rounded-xl border w-full"
             >
               <option value="">اختر حالة</option>
-              {STATUS_SELECT.map((s) => (
+              {SHORT_STATUS.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -505,7 +339,7 @@ export default function SingleRepairPage() {
             )}
             {repair.status === "مرفوض" && (
               <div className="mt-2">
-                <div className="text-sm opacity-80 mb-1">
+                <div className="text-sm text-[16px] opacity-80 mb-1">
                   مكان الجهاز عند الرفض
                 </div>
                 <select
@@ -523,187 +357,312 @@ export default function SingleRepairPage() {
               </div>
             )}
           </div>
-
           <Info
             label="القسم الحالي"
             value={info.currentDepartment?.name || "—"}
           />
           <Info label="تاريخ الإنشاء" value={formatDate(repair.createdAt)} />
-          <Info label="المستلم" value={repair?.createdBy?.name || "—"} />ff
+          <Info label="المستلم" value={repair?.createdBy?.name || "—"} />
         </div>
       </section>
 
-      {/* ===== التايملاين ===== */}
+      {/* ===== التايملاين (الخطوات) ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
-        <h3 className="text-lg font-semibold mb-3">الخطوات</h3>
-        {(info.flows || []).length === 0 ? (
-          <div className="opacity-70">لا توجد خطوات بعد. عيّن قسمًا للبدء.</div>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+            <span>الخطوات (التايملاين)</span>
+          </h3>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+            {stepsCount} خطوة
+          </span>
+        </div>
+
+        {stepsCount === 0 ? (
+          <div className="opacity-70 text-sm">
+            لا توجد خطوات بعد. عيّن قسمًا من شاشة التعديل أو انقل الصيانة لقسم
+            من الأسفل.
+          </div>
         ) : (
-          <div className="grid sm:grid-cols-2 gap-3">
-            {info.flows.map((f, i) => (
-              <div
-                key={f._id}
-                className={`p-3 rounded-2xl ${PALETTE.subtle} border dark:border-slate-700`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="font-semibold">
-                    {i + 1}. {f.department?.name || "قسم"}
+          <div className="space-y-4">
+            {info.flows.map((f, index) => {
+              const isLast = index === info.flows.length - 1;
+              const isCurrent =
+                info.currentDepartment &&
+                f.department &&
+                String(info.currentDepartment._id) === String(f.department._id);
+              const isCompleted = f.status === "completed";
+
+              const dotCls = isCurrent
+                ? "bg-indigo-500 ring-4 ring-indigo-200 dark:ring-indigo-800"
+                : isCompleted
+                ? "bg-emerald-500"
+                : "bg-slate-400";
+
+              const cardCls = isCurrent
+                ? "border-indigo-200/80 bg-indigo-50/70 dark:bg-indigo-950/40 dark:border-indigo-700"
+                : isCompleted
+                ? "border-emerald-200/80 bg-emerald-50/60 dark:bg-emerald-950/30 dark:border-emerald-700"
+                : "border-slate-200 bg-slate-50 dark:bg-slate-900/40 dark:border-slate-700";
+
+              return (
+                <div key={f._id} className="flex gap-3">
+                  {/* العمود الرأسي للتايملاين */}
+                  <div className="flex flex-col items-center pt-1">
+                    <span
+                      className={`w-3 h-3 rounded-full ${dotCls}`}
+                      aria-hidden
+                    />
+                    {!isLast && (
+                      <span className="flex-1 w-px bg-slate-300 dark:bg-slate-700 mt-1" />
+                    )}
                   </div>
-                  <span className="text-xs px-2 py-1 rounded-full border dark:border-slate-600">
-                    {STATUS_AR[f.status] || f.status}
-                  </span>
+
+                  {/* كارت الخطوة */}
+                  <article
+                    className={`flex-1 p-3 rounded-2xl border text-sm text-[16px] shadow-[0_4px_10px_rgba(15,23,42,0.04)] ${cardCls}`}
+                  >
+                    <header className="flex items-center justify-between gap-2 mb-1">
+                      <div className="font-semibold">
+                        {index + 1}. {f.department?.name || "قسم"}
+                      </div>
+                      <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/70 dark:bg-black/20 border border-white/50 dark:border-slate-600">
+                        {STATUS_AR[f.status] || f.status}
+                      </span>
+                    </header>
+
+                    <div className="text-xs md:text-sm text-[16px] mt-1">
+                      فنّي:{" "}
+                      <b>
+                        {f.technician
+                          ? f.technician.name ||
+                            f.technician.username ||
+                            f.technician.email
+                          : "غير معيّن"}
+                      </b>
+                      {" · "}
+                      السعر: <b>{Number(f.price || 0).toFixed(2)} ج.م</b>
+                    </div>
+
+                    <div className="text-[11px] opacity-70 mt-1 space-y-0.5">
+                      <div>
+                        بدأ:{" "}
+                        {f.startedAt
+                          ? new Date(f.startedAt).toLocaleString("ar-EG")
+                          : "-"}
+                      </div>
+                      <div>
+                        اكتمل:{" "}
+                        {f.completedAt
+                          ? new Date(f.completedAt).toLocaleString("ar-EG")
+                          : "-"}
+                      </div>
+                    </div>
+
+                    {f.notes && (
+                      <div className="text-xs md:text-sm text-[16px] mt-1">
+                        ملاحظات: {f.notes}
+                      </div>
+                    )}
+
+                    {isCurrent && (
+                      <div className="mt-2 text-[11px] text-indigo-700 dark:text-indigo-200">
+                        هذه هي الخطوة الحالية.
+                      </div>
+                    )}
+                  </article>
                 </div>
-                <div className="text-sm mt-1">
-                  فنّي:{" "}
-                  <b>
-                    {f.technician
-                      ? f.technician.name ||
-                        f.technician.username ||
-                        f.technician.email
-                      : "غير معيّن"}
-                  </b>
-                  {" · "}السعر: <b>{Number(f.price || 0).toFixed(2)}</b>
-                </div>
-                <div className="text-xs opacity-70 mt-1">
-                  بدأ:{" "}
-                  {f.startedAt ? new Date(f.startedAt).toLocaleString() : "-"} |
-                  اكتمل:{" "}
-                  {f.completedAt
-                    ? new Date(f.completedAt).toLocaleString()
-                    : "-"}
-                </div>
-                {f.notes && (
-                  <div className="text-sm mt-1">ملاحظات: {f.notes}</div>
-                )}
-              </div>
-            ))}
+              );
+            })}
+
+            {/* إجمالي تسعير الأقسام */}
+            <div className="mt-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-sm text-[16px] border border-slate-200/70 dark:border-slate-700">
+              إجمالي تسعير الأقسام:{" "}
+              <b>{Number(info.departmentPriceTotal || 0).toFixed(2)} ج.م</b>
+            </div>
           </div>
         )}
-
-        {/* إجمالي تسعير الأقسام */}
-        <div className="mt-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-          إجمالي تسعير الأقسام:{" "}
-          <b>{Number(info.departmentPriceTotal || 0).toFixed(2)}</b>
-        </div>
       </section>
 
       {/* ===== التحكم في الخطوة الحالية ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
-        <h3 className="text-lg font-semibold mb-3">الخطوة الحالية</h3>
-        <div className="text-sm mb-2">
-          القسم الحالي: <b>{info.currentDepartment?.name || "-"}</b>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+            <span>الخطوة الحالية</span>
+          </h3>
+          <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+            القسم الحالي: {info.currentDepartment?.name || "—"}
+          </span>
         </div>
+        <p className="text-sm text-[16px] opacity-75 mb-4">
+          من هنا تقدر تعيّن فنّي للقسم الحالي، تسعّر الخطوة وتعلّمها مكتملة، أو
+          تنقل الصيانة لقسم آخر.
+        </p>
 
-        {/* تعيين فنّي */}
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="border rounded-lg px-3 py-2"
-            value={assignTechId}
-            onChange={(e) => setAssignTechId(e.target.value)}
-            disabled={!info.acl?.canAssignTech || !info.currentDepartment}
-          >
-            <option value="">— اختر فنّيًا —</option>
-            {techs.map((t) => (
-              <option key={t._id} value={t._id}>
-                {t.name || t.username || t.email}
-              </option>
-            ))}
-          </select>
-          <ActionButton
-            onClick={async () => {
-              if (!assignTechId) return;
-              try {
-                await RepairsAPI.assignTech(id, { technicianId: assignTechId });
-                setAssignTechId("");
-                await loadTimeline();
-              } catch (e) {
-                alert(e?.response?.data?.error || "غير مسموح بتعيين الفني");
-              }
-            }}
-            disabled={!info.acl?.canAssignTech}
-          >
-            تعيين الفنّي (أو بدء العمل)
-          </ActionButton>
-        </div>
-
-        {/* إكمال الخطوة الحالية + تسعيرها */}
-        <div className="flex flex-wrap items-end gap-2 mt-4">
-          <div>
-            <label className="block text-sm mb-1">سعر القسم</label>
-            <input
-              type="number"
-              step="0.01"
-              className="border rounded-lg px-3 py-2 w-36"
-              value={stepPrice}
-              onChange={(e) => setStepPrice(e.target.value)}
-            />
+        <div className="grid gap-3 lg:grid-cols-3">
+          {/* كارت تعيين الفني */}
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm text-[16px] font-semibold">
+                تعيين الفنّي
+              </div>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+                بدء / تغيير الفني
+              </span>
+            </div>
+            <p className="text-xs opacity-70">
+              اختر فنّي من نفس القسم الحالي لتربطه بالخطوة.
+            </p>
+            <select
+              className="border rounded-lg px-3 py-2 text-sm text-[16px] mt-1"
+              value={assignTechId}
+              onChange={(e) => setAssignTechId(e.target.value)}
+              disabled={!info.acl?.canAssignTech || !info.currentDepartment}
+            >
+              <option value="">— اختر فنّيًا —</option>
+              {techs.map((t) => (
+                <option key={t._id} value={t._id}>
+                  {t.name || t.username || t.email}
+                </option>
+              ))}
+            </select>
+            <ActionButton
+              onClick={async () => {
+                if (!assignTechId) return;
+                try {
+                  await RepairsAPI.assignTech(id, {
+                    technicianId: assignTechId,
+                  });
+                  setAssignTechId("");
+                  await loadTimeline();
+                } catch (e) {
+                  alert(e?.response?.data?.error || "غير مسموح بتعيين الفني");
+                }
+              }}
+              disabled={!info.acl?.canAssignTech}
+            >
+              تعيين الفنّي / بدء العمل
+            </ActionButton>
           </div>
-          <div className="grow">
-            <label className="block text-sm mb-1">ملاحظات (اختياري)</label>
-            <input
-              className="w-full border rounded-lg px-3 py-2"
-              value={stepNotes}
-              onChange={(e) => setStepNotes(e.target.value)}
-            />
-          </div>
-          <ActionButton
-            onClick={async () => {
-              try {
-                await RepairsAPI.completeStep(id, {
-                  price: Number(stepPrice || 0),
-                  notes: stepNotes,
-                });
-                setStepPrice("");
-                setStepNotes("");
-                await loadTimeline();
-              } catch (e) {
-                alert(e?.response?.data?.error || "غير مسموح بإكمال الخطوة");
-              }
-            }}
-            disabled={
-              !info.acl?.canCompleteCurrent ||
-              !cur ||
-              cur.status === "completed"
-            }
-          >
-            تعليم كمكتمل + حفظ السعر
-          </ActionButton>
-        </div>
 
-        {/* نقل للخطوة/القسم التالي */}
-        <div className="flex flex-wrap items-center gap-2 mt-4">
-          <select
-            className="border rounded-lg px-3 py-2"
-            value={nextDept}
-            onChange={(e) => setNextDept(e.target.value)}
-          >
-            <option value="">— اختر القسم التالي —</option>
-            {deps.map((d) => (
-              <option key={d._id} value={d._id}>
-                {d.name}
-              </option>
-            ))}
-          </select>
-          <ActionButton
-            onClick={async () => {
-              if (!nextDept) return;
-              try {
-                await RepairsAPI.moveNext(id, { departmentId: nextDept });
-                setNextDept("");
-                await loadTimeline();
-              } catch (e) {
-                alert(
-                  e?.response?.data?.error || "غير مسموح بالنقل للخطوة التالية"
-                );
+          {/* كارت تسعير وإكمال الخطوة */}
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm text-[16px] font-semibold">
+                تسعير الخطوة
+              </div>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-200">
+                تعليم كمكتمل
+              </span>
+            </div>
+            <p className="text-xs opacity-70">
+              ضع سعر القسم وملاحظة مختصرة ثم علّم الخطوة كمكتملة.
+            </p>
+
+            <div className="flex flex-col gap-2 mt-1">
+              <div>
+                <label className="block text-xs mb-1">سعر القسم</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  className="border rounded-lg px-3 py-2 w-full text-sm"
+                  value={stepPrice}
+                  onChange={(e) => setStepPrice(e.target.value)}
+                />
+              </div>
+              <div>
+                <label className="block text-xs mb-1">ملاحظات (اختياري)</label>
+                <input
+                  className="w-full border rounded-lg px-3 py-2 text-sm"
+                  value={stepNotes}
+                  onChange={(e) => setStepNotes(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <ActionButton
+              onClick={async () => {
+                try {
+                  await RepairsAPI.completeStep(id, {
+                    price: Number(stepPrice || 0),
+                    notes: stepNotes,
+                  });
+                  setStepPrice("");
+                  setStepNotes("");
+                  await loadTimeline();
+                } catch (e) {
+                  alert(e?.response?.data?.error || "غير مسموح بإكمال الخطوة");
+                }
+              }}
+              disabled={
+                !info.acl?.canCompleteCurrent ||
+                !cur ||
+                cur.status === "completed"
               }
-            }}
-            disabled={
-              !info.acl?.canMoveNext ||
-              (!isCurrentCompleted && info.flows?.length > 0)
-            }
-          >
-            نقل الصيانة للقسم التالي
-          </ActionButton>
+            >
+              تعليم الخطوة كمكتملة + حفظ السعر
+            </ActionButton>
+            {cur && cur.status === "completed" && (
+              <div className="text-[11px] opacity-70">
+                هذه الخطوة معلّمة بالفعل كمكتملة.
+              </div>
+            )}
+          </div>
+
+          {/* كارت نقل للقسم التالي */}
+          <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-sm text-[16px] font-semibold">
+                نقل للقسم التالي
+              </div>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-sky-50 text-sky-700 dark:bg-sky-900/20 dark:text-sky-200">
+                الخطوة التالية
+              </span>
+            </div>
+            <p className="text-xs opacity-70">
+              اختر القسم الذي ستنتقل إليه الصيانة بعد اكتمال الخطوة الحالية.
+            </p>
+
+            <select
+              className="border rounded-lg px-3 py-2 text-sm text-[16px] mt-1"
+              value={nextDept}
+              onChange={(e) => setNextDept(e.target.value)}
+            >
+              <option value="">— اختر القسم التالي —</option>
+              {deps.map((d) => (
+                <option key={d._id} value={d._id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+            <ActionButton
+              onClick={async () => {
+                if (!nextDept) return;
+                try {
+                  await RepairsAPI.moveNext(id, { departmentId: nextDept });
+                  setNextDept("");
+                  await loadTimeline();
+                } catch (e) {
+                  alert(
+                    e?.response?.data?.error ||
+                      "غير مسموح بالنقل للخطوة التالية"
+                  );
+                }
+              }}
+              disabled={
+                !info.acl?.canMoveNext ||
+                (!isCurrentCompleted && info.flows?.length > 0)
+              }
+            >
+              نقل الصيانة للقسم التالي
+            </ActionButton>
+            {!isCurrentCompleted && info.flows?.length > 0 && (
+              <div className="text-[11px] opacity-70">
+                لا يمكن النقل إلا بعد تعليم الخطوة الحالية كمكتملة.
+              </div>
+            )}
+          </div>
         </div>
       </section>
 
@@ -720,6 +679,126 @@ export default function SingleRepairPage() {
           <Info label="السعر النهائي" value={numOrDash(repair.finalPrice)} />
           <Info label="ملاحظات" value={repair.notes || "—"} />
         </div>
+      </section>
+
+      {/* ===== قطع الغيار المستخدمة ===== */}
+      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+        <div className="flex items-center justify-between gap-2 mb-3">
+          <h3 className="text-lg font-semibold flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+            <span>قطع الغيار المستخدمة</span>
+          </h3>
+          {parts.length > 0 && (
+            <span className="text-xs px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+              {parts.length} قطعة
+            </span>
+          )}
+        </div>
+
+        {parts.length === 0 ? (
+          <div className="text-sm text-[16px] opacity-70">
+            لا توجد قطع مسجّلة لهذه الصيانة.
+          </div>
+        ) : (
+          <>
+            {/* Desktop table */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-[760px] w-full text-sm text-[16px] text-right">
+                <thead>
+                  <tr className="border-b border-slate-200 dark:border-slate-700 text-right">
+                    <th className="py-2 px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      اسم القطعة
+                    </th>
+                    <th className="py-2 px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      التكلفة
+                    </th>
+                    <th className="py-2 px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      المورد
+                    </th>
+                    <th className="py-2 px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      بواسطة
+                    </th>
+                    <th className="py-2 px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      تاريخ الشراء
+                    </th>
+                    <th className="py-2 px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+                      حالة الدفع
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {parts.map((p, idx) => (
+                    <tr
+                      key={idx}
+                      className="border-b border-slate-100 dark:border-slate-800/60"
+                    >
+                      <td className="py-2 px-2">
+                        {p.name || p.itemName || `قطعة ${idx + 1}`}
+                      </td>
+                      <td className="py-2 px-2">{numOrDash(p.cost)}</td>
+                      <td className="py-2 px-2">{p.supplier || "—"}</td>
+                      <td className="py-2 px-2">{p.source || "—"}</td>
+                      <td className="py-2 px-2">
+                        {p.purchaseDate ? formatDate(p.purchaseDate) : "—"}
+                      </td>
+                      <td className="py-2 px-2">
+                        {p.paid ? (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                            مدفوعة
+                          </span>
+                        ) : (
+                          <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+                            غير مدفوعة
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="md:hidden grid gap-2">
+              {parts.map((p, idx) => (
+                <div
+                  key={idx}
+                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="font-semibold text-sm">
+                      {p.name || p.itemName || `قطعة ${idx + 1}`}
+                    </div>
+                    <div className="text-xs font-medium">
+                      {numOrDash(p.cost)} ج.م
+                    </div>
+                  </div>
+                  <div className="text-xs opacity-75 mt-1">
+                    المورد: <b>{p.supplier || "—"}</b>
+                  </div>
+                  <div className="text-xs opacity-75">
+                    بواسطة: <b>{p.source || "—"}</b>
+                  </div>
+                  <div className="text-xs opacity-75">
+                    تاريخ الشراء:{" "}
+                    <b>{p.purchaseDate ? formatDate(p.purchaseDate) : "—"}</b>
+                  </div>
+                  <div className="mt-1">
+                    {p.paid ? (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200">
+                        مدفوعة
+                      </span>
+                    ) : (
+                      <span className="inline-flex px-2 py-0.5 rounded-full text-[11px] bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-200">
+                        غير مدفوعة
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </section>
 
       {/* ===== إرسال تحديث للعميل ===== */}
@@ -767,6 +846,8 @@ export default function SingleRepairPage() {
                   alert("تم الإرسال للعميل");
                   setCuText("");
                   setCuFileUrl("");
+                } catch (e) {
+                  console.log(e.message);
                 } finally {
                   setCuSending(false);
                 }
@@ -789,8 +870,8 @@ export default function SingleRepairPage() {
             />
             سجل الحركات
           </h3>
-          <span className="text-xs md:text-sm px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
-            {count} حدث
+          <span className="text-xs md:text-sm text-[16px] px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800">
+            {logsCount} حدث
           </span>
         </div>
 
@@ -811,7 +892,7 @@ export default function SingleRepairPage() {
               </tr>
             </thead>
             <tbody>
-              {count === 0 ? (
+              {logsCount === 0 ? (
                 <tr>
                   <td colSpan={3} className="py-6 px-3 text-center opacity-70">
                     لا يوجد سجل.
@@ -835,7 +916,6 @@ export default function SingleRepairPage() {
                           "bg-slate-100 text-slate-800 dark:bg-slate-700"
                         }`}
                       >
-                        {/* نقطة ملونة صغيرة */}
                         <span
                           className="w-1.5 h-1.5 rounded-full bg-current opacity-70"
                           aria-hidden
@@ -844,7 +924,6 @@ export default function SingleRepairPage() {
                       </span>
                     </td>
                     <td className="py-2.5 px-3">
-                      {/* نعيد استخدام LogRow لو عندك تفاصيله—أو نعرض الوصف المختصر */}
                       <LogRow log={lg} deps={deps} flows={info.flows} />
                     </td>
                   </tr>
@@ -856,7 +935,7 @@ export default function SingleRepairPage() {
 
         {/* Mobile cards */}
         <div className="md:hidden grid gap-2">
-          {count === 0 ? (
+          {logsCount === 0 ? (
             <div className="opacity-70">لا يوجد سجل.</div>
           ) : (
             info.logs.map((lg, i) => {
@@ -890,7 +969,9 @@ export default function SingleRepairPage() {
                     </span>
                   </header>
 
-                  <h4 className="text-sm mt-2 font-semibold">{summary}</h4>
+                  <h4 className="text-sm text-[16px] mt-2 font-semibold">
+                    {summary}
+                  </h4>
 
                   {Array.isArray(details) && details.length > 0 && (
                     <ul className="list-disc pr-5 mt-1 space-y-1 text-[13px] leading-5">
@@ -999,7 +1080,7 @@ export default function SingleRepairPage() {
         />
       )}
 
-      {/* Inputs base style */}
+      {/* Inputs base style (لـ بعض الإنبتس في المودال) */}
       <style>{`.inp{padding:.6rem .8rem;border-radius:.9rem;background:var(--inp-bg,#f3f4f6)}`}</style>
     </div>
   );
@@ -1036,173 +1117,6 @@ function Info({ label, value, children }) {
   );
 }
 
-const STATUS_AR = {
-  waiting: "في الانتظار",
-  in_progress: "جاري العمل",
-  completed: "مكتمل",
-};
-
-/* ==== سجلّ الحركات بصياغة ودّية ==== */
-const TYPE_AR = {
-  create: "إنشاء",
-  update: "تعديل",
-  status_change: "تغيير حالة",
-  assign_technician: "تعيين فنّي",
-  flow_complete: "اكتمال خطوة",
-  move_next: "نقل إلى قسم",
-  delete: "حذف",
-};
-const STATUS_AR_FULL = {
-  waiting: "في الانتظار",
-  in_progress: "جاري العمل",
-  completed: "مكتمل",
-  "في الانتظار": "في الانتظار",
-  "جاري العمل": "جاري العمل",
-  مكتمل: "مكتمل",
-  "تم التسليم": "تم التسليم",
-  مرفوض: "مرفوض",
-  مرتجع: "مرتجع",
-};
-
-function friendlyField(key = "") {
-  const map = {
-    status: "الحالة",
-    price: "السعر",
-    finalPrice: "السعر النهائي",
-    color: "اللون",
-    deviceType: "نوع الجهاز",
-    issue: "العطل",
-    technician: "الفني",
-    deliveryDate: "تاريخ التسليم",
-    returnDate: "تاريخ المرتجع",
-    rejectedDeviceLocation: "مكان الجهاز (مرفوض)",
-    parts: "قطع الغيار",
-    notes: "ملاحظات",
-    phone: "الهاتف",
-    customerName: "اسم العميل",
-  };
-  return map[key] || key;
-}
-function renderVal(v) {
-  if (Array.isArray(v)) return `(${v.length} عنصر)`;
-  if (v === null || v === undefined || v === "") return "—";
-  if (typeof v === "boolean") return v ? "نعم" : "لا";
-  if (typeof v === "number") return String(v);
-  if (typeof v === "string") return v.length > 50 ? v.slice(0, 50) + "…" : v;
-  try {
-    const s = JSON.stringify(v);
-    return s.length > 60 ? s.slice(0, 60) + "…" : s;
-  } catch {
-    return "—";
-  }
-}
-function describeLog(log, { deps = [], flows = [] } = {}) {
-  const p = log?.payload || {};
-  const depById = new Map(deps.map((d) => [String(d._id), d]));
-  const flowById = new Map(flows.map((f) => [String(f._id), f]));
-  const out = { summary: "", details: [], partsChange: null };
-
-  switch (log?.type) {
-    case "create":
-      out.summary = "تم إنشاء الصيانة";
-      break;
-
-    case "status_change": {
-      const st = STATUS_AR_FULL[p.status] || p.status || "—";
-      out.summary = `تم تغيير الحالة إلى «${st}»`;
-      break;
-    }
-
-    case "assign_technician": {
-      const f = p.flowId ? flowById.get(String(p.flowId)) : null;
-      const depName =
-        f?.department?.name ||
-        depById.get(String(f?.department))?.name ||
-        "قسم";
-      const techName =
-        f?.technician?.name ||
-        p.technicianName ||
-        (p.technicianId
-          ? `الفنّي (#${String(p.technicianId).slice(-4)})`
-          : "—");
-      out.summary = `تم تعيين «${techName}» على خطوة قسم «${depName}»`;
-      break;
-    }
-
-    case "flow_complete": {
-      const f = p.flowId ? flowById.get(String(p.flowId)) : null;
-      const depName =
-        f?.department?.name ||
-        depById.get(String(f?.department))?.name ||
-        "قسم";
-      out.summary = `اكتملت خطوة قسم «${depName}»`;
-      if (Number.isFinite(Number(p.price)))
-        out.details.push(`سعر القسم: ${Number(p.price).toFixed(2)} جنيه`);
-      if (p.notes) out.details.push(`ملاحظات: ${p.notes}`);
-      break;
-    }
-
-    case "move_next": {
-      const depName = depById.get(String(p.departmentId))?.name || "—";
-      out.summary = `تم نقل الصيانة إلى قسم «${depName}»`;
-      break;
-    }
-
-    case "update": {
-      out.summary = "تم تعديل البيانات";
-      const changes = Array.isArray(p.changes) ? p.changes : [];
-      for (const c of changes) {
-        if (c.field === "parts") {
-          out.partsChange = { fromVal: c.from, toVal: c.to };
-          continue;
-        }
-        const label = friendlyField(c.field);
-        const fromTxt = renderVal(c.from);
-        const toTxt = renderVal(c.to);
-        out.details.push(`${label}: من «${fromTxt}» إلى «${toTxt}»`);
-      }
-      break;
-    }
-
-    case "delete":
-      out.summary = "تم حذف الصيانة";
-      break;
-
-    default:
-      out.summary = TYPE_AR[log?.type] || log?.type || "—";
-      if (p && Object.keys(p).length) out.details.push(JSON.stringify(p));
-  }
-
-  return out;
-}
-function LogRow({ log, deps, flows }) {
-  const { summary, details } = describeLog(log, { deps, flows });
-  const timeTxt = new Date(
-    log.at || log.createdAt || Date.now()
-  ).toLocaleString("ar-EG");
-  return (
-    <tr className="align-top">
-      <td className="py-2 px-2 whitespace-nowrap">{timeTxt}</td>
-      <td className="py-2 px-2 whitespace-nowrap">
-        {TYPE_AR[log.type] || log.type}
-      </td>
-      <td className="py-2 px-2">
-        <div>{summary}</div>
-        {Array.isArray(details) && details.length > 0 && (
-          <ul className="list-disc pr-5 mt-1 space-y-1">
-            {details.map((d, i) => (
-              <li key={i}>{d}</li>
-            ))}
-          </ul>
-        )}
-      </td>
-    </tr>
-  );
-}
-
-// PartsChange اختياري: لو عندك نفس المكوّن في المشروع هيشتغل تلقائيًا.
-// لو مش موجود، احذف جزء استدعاؤه داخل LogRow.
-
 function addDays(n) {
   const d = new Date();
   d.setDate(d.getDate() + n);
@@ -1215,55 +1129,4 @@ function formatDate(d) {
   } catch {
     return "—";
   }
-}
-
-/* ===== مودال ما بعد الإكمال/التسليم ===== */
-function AfterCompleteModal({
-  open,
-  onClose,
-  onPrint,
-  onWhatsApp,
-  hasWarranty,
-}) {
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
-      <div className="bg-white dark:bg-gray-800 w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
-        <h3 className="text-lg font-semibold">تم إنهاء العملية</h3>
-        <p className="text-sm opacity-80">
-          {hasWarranty
-            ? "هل تودّ طباعة إيصال الضمان أو مراسلة العميل على واتساب؟"
-            : "هل تودّ مراسلة العميل على واتساب؟"}
-        </p>
-        <div
-          className={`grid ${
-            hasWarranty ? "sm:grid-cols-2" : "sm:grid-cols-1"
-          } gap-2`}
-        >
-          {hasWarranty && (
-            <button
-              className={`px-3 py-2 rounded-xl ${PALETTE.ok}`}
-              onClick={() => onPrint?.()}
-            >
-              طباعة إيصال الضمان
-            </button>
-          )}
-          <button
-            className={`px-3 py-2 rounded-xl bg-green-600 text-white`}
-            onClick={() => onWhatsApp?.()}
-          >
-            إرسال رسالة واتساب
-          </button>
-        </div>
-        <div className="flex justify-end">
-          <button
-            className={`px-3 py-2 rounded-xl ${PALETTE.outline}`}
-            onClick={onClose}
-          >
-            إغلاق
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }

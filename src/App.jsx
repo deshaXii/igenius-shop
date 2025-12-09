@@ -29,6 +29,7 @@ import DirectChatPage from "./features/chat/DirectChatPage";
 import InventoryPage from "./features/inventory/InventoryPage";
 import SuppliersPage from "./features/suppliers/SuppliersPage";
 import SupplierDetailsPage from "./features/suppliers/SupplierDetailsPage";
+import RepairsFeedbackPage from "./features/repairs/RepairsFeedbackPage";
 
 import RequirePermRoute from "./features/auth/RequirePermRoute";
 
@@ -43,9 +44,8 @@ export default function App() {
       {/* صفحات محمية */}
       <Route element={<ProtectedRoute />}>
         <Route element={<MainLayout />}>
-
           <Route path="/settings/departments" element={<DepartmentsPage />} />
-          
+          <Route path="/feedback" element={<RepairsFeedbackPage />} />
           <Route index element={<Navigate to="/repairs" replace />} />
           <Route path="/repairs" element={<RepairsPage />} />
           <Route path="/repairs/new" element={<NewRepairPage />} />

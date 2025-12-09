@@ -29,8 +29,7 @@ export default function QrAfterCreateModal({
       ? String(API.defaults.baseURL)
       : "") || "";
   const API_BASE_TRIM = API_BASE.replace(/\/$/, "");
-  const ORIGIN =
-    typeof window !== "undefined" ? window.location.origin : "";
+  const ORIGIN = typeof window !== "undefined" ? window.location.origin : "";
   // fallback لو baseURL مش متضبوطة
   const BASE_URL = API_BASE_TRIM || ORIGIN;
 
@@ -95,7 +94,10 @@ export default function QrAfterCreateModal({
   /* ================= أدوات مساعدة للطباعة ================= */
   const printViaIframe = (htmlBody, title = "Print") => {
     // تطبيق إعدادات الطابعة الحرارية
-    const width = Math.max(40, Math.min(120, Number(receiptPaperWidthMm) || 80));
+    const width = Math.max(
+      40,
+      Math.min(120, Number(receiptPaperWidthMm) || 80)
+    );
     const margin = Math.max(0, Math.min(20, Number(receiptMarginMm) || 5));
     const fontPt = Math.max(8, Math.min(24, Number(receiptFontSizePt) || 12));
 
@@ -197,7 +199,9 @@ export default function QrAfterCreateModal({
                  <div>${phones
                    .map(
                      (p, i) =>
-                       `<div><b>(${i + 1})</b> <span class="muted" dir="ltr">${String(
+                       `<div><b>(${
+                         i + 1
+                       })</b> <span class="muted" dir="ltr">${String(
                          p
                        )}</span></div>`
                    )
@@ -264,7 +268,7 @@ export default function QrAfterCreateModal({
         {/* Header */}
         <div className="flex items-center gap-3">
           <div className="text-lg font-extrabold">تتبُّع الصيانة</div>
-          <div className="ms-auto text-sm text-gray-500">
+          <div className="ms-auto text-sm text-[16px] text-gray-500">
             رقم الإيصال:{" "}
             <span className="font-semibold">{ticketNo || "—"}</span>
           </div>
@@ -275,7 +279,7 @@ export default function QrAfterCreateModal({
           {qrSrc ? (
             <img alt="qr" src={qrSrc} className="mx-auto w-48 h-48" />
           ) : (
-            <div className="text-center text-sm text-gray-500">
+            <div className="text-center text-sm text-[16px] text-gray-500">
               جارٍ توليد الكود…
             </div>
           )}

@@ -79,7 +79,9 @@ export default function SettingsPage() {
 
   async function saveDefault() {
     try {
-      await API.put("/settings", { defaultTechCommissionPct: Number(defaultPct) });
+      await API.put("/settings", {
+        defaultTechCommissionPct: Number(defaultPct),
+      });
       alert("تم حفظ النسبة الافتراضية");
     } catch (e) {
       alert(e?.response?.data?.message || "خطأ");
@@ -181,9 +183,7 @@ export default function SettingsPage() {
 
   if (loading) return <div>جارِ التحميل...</div>;
   if (err)
-    return (
-      <div className="p-3 rounded-xl bg-rose-50 text-rose-800">{err}</div>
-    );
+    return <div className="p-3 rounded-xl bg-rose-50 text-rose-800">{err}</div>;
 
   return (
     <div className="space-y-6">
@@ -201,7 +201,7 @@ export default function SettingsPage() {
             onChange={(e) => setDefaultPct(e.target.value)}
             className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 w-28"
           />
-        <span>%</span>
+          <span>%</span>
           <button
             onClick={saveDefault}
             className="px-4 py-2 rounded-xl bg-blue-600 text-white hover:opacity-90"
@@ -375,13 +375,13 @@ export default function SettingsPage() {
 
         {/* معاينة تقريبية */}
         <div className="mt-2">
-          <div className="text-sm font-semibold mb-2">معاينة</div>
+          <div className="text-sm text-[14px] font-semibold mb-2">معاينة</div>
           <div
             className="rounded-xl border border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900"
             style={{ ...previewStyles }}
           >
             <div className="text-center font-bold">IGenius</div>
-            <div className="text-sm opacity-70 text-center">
+            <div className="text-sm text-[14px] opacity-70 text-center">
               إيصال استلام — نموذج
             </div>
             <hr style={{ margin: "8px 0", borderTop: "1px dashed #bbb" }} />

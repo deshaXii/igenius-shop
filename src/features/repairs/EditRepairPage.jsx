@@ -11,21 +11,12 @@ import useAuthStore from "../auth/authStore";
 import DeliveryModal from "../../components/DeliveryModal";
 import InventoryItemSelect from "../../components/parts/InventoryItemSelect";
 import SupplierSelect from "../../components/parts/SupplierSelect";
+import VoiceInput from "../../components/VoiceInput";
+import AfterCompleteModal from "../../components/AfterCompleteModal";
+import { PALETTE } from "../../utils/ui";
+import toNum from "../../components/helpers/toNum";
+import { SHORT_STATUS } from "../../utils/data";
 
-/* ---------- ألوان/ثيم ---------- */
-const PALETTE = {
-  card: "bg-white/90 dark:bg-[#1c273fe6] border border-slate-200 dark:border-slate-800 backdrop-blur",
-  outline:
-    "border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800",
-  primary:
-    "bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-indigo-500 text-white",
-  danger: "bg-rose-600 hover:bg-rose-700 text-white",
-};
-
-function toNum(v) {
-  const n = Number(v);
-  return Number.isFinite(n) ? n : null;
-}
 function normalizeLoadedRepair(r) {
   return {
     ...r,
@@ -38,29 +29,23 @@ function includeNumberField(obj, key, val) {
   const n = Number(val);
   return Number.isFinite(n) ? { ...obj, [key]: n } : obj;
 }
-const STATUS_SELECT = ["مكتمل", "تم التسليم", "مرفوض"];
 
 export default function EditRepairPage() {
   const { id } = useParams();
   const nav = useNavigate();
   const { user } = useAuthStore();
-
   const isAdmin = user?.role === "admin" || user?.permissions?.adminOverride;
   const canEditAll = isAdmin || user?.permissions?.editRepair;
-
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
   const [deps, setDeps] = useState([]);
   const [techs, setTechs] = useState([]);
   const [timeline, setTimeline] = useState({
     currentDepartment: null,
     flows: [],
   });
-
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [requirePassword, setRequirePassword] = useState(false);
-
   const [repair, setRepair] = useState(null);
   const [form, setForm] = useState({
     customerName: "",
@@ -80,11 +65,9 @@ export default function EditRepairPage() {
     rejectedDeviceLocation: "",
     currentDepartment: "",
   });
-
   const [hasWarranty, setHasWarranty] = useState(false);
   const [warrantyNotes, setWarrantyNotes] = useState("");
   const [warrantyEnd, setWarrantyEnd] = useState("");
-
   const [afterCompleteOpen, setAfterCompleteOpen] = useState(false);
   const [showWarrantyModal, setShowWarrantyModal] = useState(false);
 
@@ -390,24 +373,59 @@ export default function EditRepairPage() {
     }
   }
 
-  if (loading) return <div>جارِ التحميل...</div>;
+  if (loading)
+    return (
+      <div className="min-h-[40vh] grid place-items-center text-sm text-[16px] opacity-70">
+        جارِ التحميل...
+      </div>
+    );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-6xl mx-auto pb-24">
       {/* ===== Header Gradient ===== */}
-      <div className="rounded-3xl overflow-hidden">
+      <div className="rounded-3xl overflow-hidden shadow-sm">
         <div className="bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 text-white p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">تعديل صيانة</h1>
-              <p className="opacity-90 mt-1">
+              <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
+                <span>تعديل صيانة</span>
+                {repair?.repairId && (
+                  <span className="text-sm text-[16px] md:text-base px-2 py-0.5 rounded-full bg-black/20 border border-white/20">
+                    #{repair.repairId}
+                  </span>
+                )}
+              </h1>
+              <p className="opacity-90 mt-1 text-sm text-[16px] md:text-base">
                 غيّر البيانات ووزّع القطع ثم احفظ التعديلات.
               </p>
+
+              {repair && (
+                <div className="mt-3 flex flex-wrap gap-2 text-[11px] md:text-xs">
+                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/20">
+                    العميل:{" "}
+                    <span className="font-semibold">
+                      {repair.customerName || "—"}
+                    </span>
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/20">
+                    الجهاز:{" "}
+                    <span className="font-semibold">
+                      {repair.deviceType || "—"}
+                    </span>
+                  </span>
+                  <span className="px-2 py-1 rounded-full bg-white/10 border border-white/20">
+                    الحالة الحالية:{" "}
+                    <span className="font-semibold">
+                      {repair.status || "غير محددة"}
+                    </span>
+                  </span>
+                </div>
+              )}
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Link
                 to={`/repairs/${id}`}
-                className="px-3 py-2 rounded-xl bg-white/90 text-indigo-700 hover:opacity-90"
+                className="px-3 py-2 rounded-xl bg-white/90 text-indigo-700 hover:opacity-90 shadow-sm text-sm"
               >
                 عودة للتفاصيل
               </Link>
@@ -420,15 +438,15 @@ export default function EditRepairPage() {
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <div className="grid md:grid-cols-3 gap-3 items-end">
           <div>
-            <div className="text-sm opacity-80 mb-1">الحالة</div>
+            <div className="text-sm text-[16px] opacity-80 mb-1">الحالة</div>
             <select
               value={form.status}
               onChange={(e) => onStatusChange(e.target.value)}
               disabled={!canEditAll && !isAssigned}
-              className="px-3 py-2 rounded-xl border w-full"
+              className="inp w-full"
             >
               <option value="">اختر حالة</option>
-              {STATUS_SELECT.map((s) => (
+              {SHORT_STATUS.map((s) => (
                 <option key={s} value={s}>
                   {s}
                 </option>
@@ -440,8 +458,8 @@ export default function EditRepairPage() {
               </div>
             )}
             {form.status === "مرفوض" && (
-              <div className="mt-2">
-                <div className="text-sm opacity-80 mb-1">
+              <div className="mt-2 space-y-1">
+                <div className="text-sm text-[16px] opacity-80">
                   مكان الجهاز عند الرفض
                 </div>
                 <select
@@ -449,7 +467,7 @@ export default function EditRepairPage() {
                   onChange={(e) =>
                     setField("rejectedDeviceLocation", e.target.value)
                   }
-                  className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
+                  className="inp bg-red-50/80 dark:bg-red-900/20 text-red-800 dark:text-red-200"
                   disabled={!canEditAll && !isAssigned}
                 >
                   <option value="بالمحل">بالمحل</option>
@@ -469,7 +487,10 @@ export default function EditRepairPage() {
 
       {/* ===== توجيه (قسم/فنّي) ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
-        <h2 className="text-lg font-semibold mb-3">التوجيه</h2>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+          <span>التوجيه</span>
+        </h2>
         <div className="grid md:grid-cols-2 gap-3">
           <Field label="القسم الحالي">
             <select
@@ -506,7 +527,10 @@ export default function EditRepairPage() {
 
       {/* ===== معلومات العميل/الجهاز ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
-        <h2 className="text-lg font-semibold mb-3">البيانات العامة</h2>
+        <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+          <span>البيانات العامة</span>
+        </h2>
         <div className="grid md:grid-cols-2 gap-3">
           <Field label="اسم العميل">
             <input
@@ -591,7 +615,9 @@ export default function EditRepairPage() {
         {hasWarranty && (
           <div className="grid md:grid-cols-2 gap-3 mt-3">
             <div>
-              <div className="text-sm mb-1">تاريخ انتهاء الضمان</div>
+              <div className="text-sm text-[16px] mb-1">
+                تاريخ انتهاء الضمان
+              </div>
               <input
                 type="date"
                 className="inp w-full"
@@ -601,9 +627,9 @@ export default function EditRepairPage() {
               />
             </div>
             <div className="md:col-span-2">
-              <div className="text-sm mb-1">ملاحظات الضمان</div>
+              <div className="text-sm text-[16px] mb-1">ملاحظات الضمان</div>
               <textarea
-                className="inp w-full"
+                className="inp w-full min-h-[80px]"
                 rows={3}
                 value={warrantyNotes}
                 onChange={(e) => setWarrantyNotes(e.target.value)}
@@ -617,11 +643,14 @@ export default function EditRepairPage() {
       {/* ===== قطع الغيار ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold">قطع الغيار</h2>
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
+            <span>قطع الغيار</span>
+          </h2>
           {canEditAll && (
             <button
               onClick={addPart}
-              className={`px-3 py-1.5 rounded-xl ${PALETTE.outline}`}
+              className={`px-3 py-1.5 rounded-xl text-sm text-[16px] ${PALETTE.outline}`}
             >
               + إضافة قطعة
             </button>
@@ -629,249 +658,123 @@ export default function EditRepairPage() {
         </div>
 
         {form.parts.length === 0 ? (
-          <div className="opacity-70">لا توجد قطع</div>
+          <div className="opacity-70 text-sm">لا توجد قطع</div>
         ) : (
-          <>
-            {/* Desktop */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="min-w-[960px] w-full text-sm">
-                <thead>
-                  <tr className="text-right border-b">
-                    <Th>الصنف (من المخزن)</Th>
-                    <Th>اسم القطعة</Th>
-                    <Th>التكلفة</Th>
-                    <Th>المورد</Th>
-                    <Th>بواسطة</Th>
-                    <Th>تاريخ الشراء</Th>
-                    <Th>مدفوعة؟</Th>
-                    {canEditAll && <Th>حذف</Th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.parts.map((p, i) => (
-                    <tr key={i} className="border-b">
-                      <Td className="min-w-[220px]">
-                        <InventoryItemSelect
-                          value={p.itemId || ""}
-                          onChange={(id, obj) => {
-                            updatePart(i, "itemId", id);
-                            updatePart(i, "itemName", obj?.name || "");
-                            if (!p.name && obj?.name)
-                              updatePart(i, "name", obj.name);
-                            if (
-                              (p.cost === "" || p.cost == null) &&
-                              typeof obj?.unitCost === "number"
-                            ) {
-                              updatePart(i, "cost", obj.unitCost);
-                            }
-                          }}
-                          disabled={!canEditAll}
-                        />
-                      </Td>
-                      <Td>
-                        <input
-                          value={p.name}
-                          onChange={(e) =>
-                            updatePart(i, "name", e.target.value)
-                          }
-                          className="inp w-full"
-                          disabled={!canEditAll}
-                        />
-                      </Td>
-                      <Td>
-                        <input
-                          type="number"
-                          value={p.cost}
-                          onChange={(e) =>
-                            updatePart(i, "cost", e.target.value)
-                          }
-                          className="inp w-28"
-                          disabled={!canEditAll}
-                        />
-                      </Td>
-                      <Td className="min-w-[200px]">
-                        <SupplierSelect
-                          value={p.supplierId || ""}
-                          onChange={(id, obj) => {
-                            updatePart(i, "supplierId", id);
-                            updatePart(
-                              i,
-                              "supplier",
-                              obj ? (obj.isShop ? "المحل" : obj.name) : ""
-                            );
-                          }}
-                          disabled={!canEditAll}
-                        />
-                      </Td>
-                      <Td>
-                        <input
-                          value={p.source}
-                          onChange={(e) =>
-                            updatePart(i, "source", e.target.value)
-                          }
-                          className="inp w-full"
-                          disabled={!canEditAll}
-                        />
-                      </Td>
-                      <Td>
-                        <input
-                          type="date"
-                          value={p.purchaseDate || ""}
-                          onChange={(e) =>
-                            updatePart(i, "purchaseDate", e.target.value)
-                          }
-                          className="inp"
-                          disabled={!canEditAll}
-                        />
-                      </Td>
-                      <Td className="text-center">
-                        <input
-                          type="checkbox"
-                          checked={!!p.paid}
-                          onChange={(e) =>
-                            updatePart(i, "paid", e.target.checked)
-                          }
-                          disabled={!canEditAll}
-                        />
-                      </Td>
-                      {canEditAll && (
-                        <Td>
-                          <button
-                            onClick={() => removePart(i)}
-                            className={`px-2 py-1.5 rounded-lg ${PALETTE.danger}`}
-                          >
-                            حذف
-                          </button>
-                        </Td>
-                      )}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile cards */}
-            <div className="md:hidden grid gap-3">
-              {form.parts.map((p, i) => (
-                <div
-                  key={i}
-                  className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium">قطعة #{i + 1}</div>
-                    {canEditAll && (
-                      <button
-                        onClick={() => removePart(i)}
-                        className={`px-2 py-1 rounded-lg ${PALETTE.danger}`}
-                      >
-                        حذف
-                      </button>
-                    )}
+          <div className="grid gap-3 md:grid-cols-2">
+            {form.parts.map((p, i) => (
+              <div
+                key={i}
+                className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700/80 shadow-[0_6px_14px_rgba(15,23,42,0.04)]"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-100">
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                    <span>قطعة #{i + 1}</span>
                   </div>
-
-                  <div className="grid gap-2">
-                    <div>
-                      <div className="text-xs opacity-70 mb-1">
-                        الصنف (من المخزن)
-                      </div>
-                      <InventoryItemSelect
-                        value={p.itemId || ""}
-                        onChange={(id, obj) => {
-                          updatePart(i, "itemId", id);
-                          updatePart(i, "itemName", obj?.name || "");
-                          if (!p.name && obj?.name)
-                            updatePart(i, "name", obj.name);
-                          if (
-                            (p.cost === "" || p.cost == null) &&
-                            typeof obj?.unitCost === "number"
-                          ) {
-                            updatePart(i, "cost", obj.unitCost);
-                          }
-                        }}
-                        disabled={!canEditAll}
-                      />
-                    </div>
-
-                    <TwoCols>
-                      <MiniField label="اسم القطعة">
-                        <input
-                          value={p.name}
-                          onChange={(e) =>
-                            updatePart(i, "name", e.target.value)
-                          }
-                          className="inp w-full"
-                          disabled={!canEditAll}
-                        />
-                      </MiniField>
-                      <MiniField label="التكلفة">
-                        <input
-                          type="number"
-                          value={p.cost}
-                          onChange={(e) =>
-                            updatePart(i, "cost", e.target.value)
-                          }
-                          className="inp w-full"
-                          disabled={!canEditAll}
-                        />
-                      </MiniField>
-                    </TwoCols>
-
-                    <div>
-                      <div className="text-xs opacity-70 mb-1">المورد</div>
-                      <SupplierSelect
-                        value={p.supplierId || ""}
-                        onChange={(id, obj) => {
-                          updatePart(i, "supplierId", id);
-                          updatePart(
-                            i,
-                            "supplier",
-                            obj ? (obj.isShop ? "المحل" : obj.name) : ""
-                          );
-                        }}
-                        disabled={!canEditAll}
-                      />
-                    </div>
-
-                    <TwoCols>
-                      <MiniField label="بواسطة">
-                        <input
-                          value={p.source}
-                          onChange={(e) =>
-                            updatePart(i, "source", e.target.value)
-                          }
-                          className="inp w-full"
-                          disabled={!canEditAll}
-                        />
-                      </MiniField>
-                      <MiniField label="تاريخ الشراء">
-                        <input
-                          type="date"
-                          value={p.purchaseDate || ""}
-                          onChange={(e) =>
-                            updatePart(i, "purchaseDate", e.target.value)
-                          }
-                          className="inp w-full"
-                          disabled={!canEditAll}
-                        />
-                      </MiniField>
-                    </TwoCols>
-
-                    <label className="flex items-center gap-2 text-sm">
-                      <input
-                        type="checkbox"
-                        checked={!!p.paid}
-                        onChange={(e) =>
-                          updatePart(i, "paid", e.target.checked)
-                        }
-                        disabled={!canEditAll}
-                      />
-                      <span>مدفوعة؟</span>
-                    </label>
-                  </div>
+                  {canEditAll && (
+                    <button
+                      onClick={() => removePart(i)}
+                      className={`px-2 py-1 rounded-lg text-xs ${PALETTE.danger}`}
+                    >
+                      حذف
+                    </button>
+                  )}
                 </div>
-              ))}
-            </div>
-          </>
+
+                <div className="grid gap-2">
+                  <div>
+                    <div className="text-xs opacity-70 mb-1">
+                      الصنف (من المخزن)
+                    </div>
+                    <InventoryItemSelect
+                      value={p.itemId || ""}
+                      onChange={(id, obj) => {
+                        updatePart(i, "itemId", id);
+                        updatePart(i, "itemName", obj?.name || "");
+                        if (!p.name && obj?.name)
+                          updatePart(i, "name", obj.name);
+                        if (
+                          (p.cost === "" || p.cost == null) &&
+                          typeof obj?.unitCost === "number"
+                        ) {
+                          updatePart(i, "cost", obj.unitCost);
+                        }
+                      }}
+                      disabled={!canEditAll}
+                    />
+                  </div>
+
+                  <TwoCols>
+                    <MiniField label="اسم القطعة">
+                      <InputWithVoice
+                        value={p.name}
+                        onChangeValue={(v) => updatePart(i, "name", v)}
+                        disabled={!canEditAll}
+                        placeholder="اسم القطعة"
+                      />
+                    </MiniField>
+                    <MiniField label="التكلفة">
+                      <input
+                        type="number"
+                        value={p.cost}
+                        onChange={(e) => updatePart(i, "cost", e.target.value)}
+                        className="inp w-full"
+                        disabled={!canEditAll}
+                      />
+                    </MiniField>
+                  </TwoCols>
+
+                  <div>
+                    <div className="text-xs opacity-70 mb-1">المورد</div>
+                    <SupplierSelect
+                      value={p.supplierId || ""}
+                      onChange={(id, obj) => {
+                        updatePart(i, "supplierId", id);
+                        updatePart(
+                          i,
+                          "supplier",
+                          obj ? (obj.isShop ? "المحل" : obj.name) : ""
+                        );
+                      }}
+                      disabled={!canEditAll}
+                    />
+                  </div>
+
+                  <TwoCols>
+                    <MiniField label="بواسطة">
+                      <InputWithVoice
+                        value={p.source}
+                        onChangeValue={(v) => updatePart(i, "source", v)}
+                        disabled={!canEditAll}
+                        placeholder="بواسطة"
+                      />
+                    </MiniField>
+                    <MiniField label="تاريخ الشراء">
+                      <input
+                        type="date"
+                        value={p.purchaseDate || ""}
+                        onChange={(e) =>
+                          updatePart(i, "purchaseDate", e.target.value)
+                        }
+                        className="inp w-full"
+                        disabled={!canEditAll}
+                      />
+                    </MiniField>
+                  </TwoCols>
+
+                  <label className="flex items-center gap-2 text-xs mt-1">
+                    <input
+                      type="checkbox"
+                      checked={!!p.paid}
+                      onChange={(e) => updatePart(i, "paid", e.target.checked)}
+                      disabled={!canEditAll}
+                    />
+                    <span>مدفوعة؟</span>
+                  </label>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </section>
 
@@ -880,12 +783,12 @@ export default function EditRepairPage() {
         <button
           onClick={submitGeneral}
           disabled={saving || !canEditAll}
-          className={`px-5 py-2.5 rounded-xl ${PALETTE.primary} disabled:opacity-50`}
+          className={`px-5 py-2.5 rounded-xl ${PALETTE.primary} disabled:opacity-50 shadow-sm`}
         >
           {saving ? "جارِ الحفظ..." : "حفظ التعديلات"}
         </button>
         {!canEditAll && (
-          <span className="text-sm opacity-70">
+          <span className="text-sm text-[16px] opacity-70">
             يمكنك تغيير الحالة فقط من أعلى الصفحة.
           </span>
         )}
@@ -921,7 +824,7 @@ export default function EditRepairPage() {
       {/* مودال تاريخ الضمان */}
       {showWarrantyModal && (
         <div className="fixed inset-0 grid place-items-center bg-black/40 z-50">
-          <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl w-[380px] space-y-3">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl w-[380px] space-y-3 shadow-xl">
             <h3 className="text-lg font-semibold">حدد تاريخ انتهاء الضمان</h3>
             <input
               type="date"
@@ -974,7 +877,27 @@ export default function EditRepairPage() {
         />
       )}
 
-      <style>{`.inp{padding:.6rem .8rem;border-radius:.9rem;background:var(--inp-bg,#f3f4f6)} .repair-parts-table th,.repair-parts-table td{vertical-align:top}`}</style>
+      <style>{`
+        .inp{
+          padding:.6rem .8rem;
+          border-radius:.9rem;
+          background:var(--inp-bg,#f3f4f6);
+          border:1px solid rgba(148,163,184,.45);
+          font-size:0.875rem;
+          transition:
+            border-color .15s ease,
+            box-shadow .15s ease,
+            background-color .15s ease,
+            transform .05s ease;
+        }
+        .inp:focus{
+          outline:none;
+          border-color:rgb(129 140 248);
+          box-shadow:0 0 0 1px rgba(129,140,248,.45);
+          background:#ffffff;
+          transform:translateY(-0.5px);
+        }
+      `}</style>
     </div>
   );
 }
@@ -982,16 +905,16 @@ export default function EditRepairPage() {
 /* ===== عناصر مساعدة للـUI ===== */
 function Field({ label, children }) {
   return (
-    <label className="space-y-1">
-      <div className="text-sm opacity-80">{label}</div>
+    <label className="space-y-1 text-sm">
+      <div className="text-sm text-[16px] opacity-80">{label}</div>
       {children}
     </label>
   );
 }
 function Info({ label, value }) {
   return (
-    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800">
-      <div className="text-xs opacity-70">{label}</div>
+    <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-sm">
+      <div className="text-[11px] opacity-70 mb-0.5">{label}</div>
       <div className="font-semibold">{value}</div>
     </div>
   );
@@ -1008,16 +931,6 @@ function formatDate(d) {
     return "—";
   }
 }
-function Th({ children }) {
-  return (
-    <th className="py-2 px-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-      {children}
-    </th>
-  );
-}
-function Td({ children, className = "" }) {
-  return <td className={`py-2 px-2 ${className}`}>{children}</td>;
-}
 function TwoCols({ children }) {
   return <div className="grid grid-cols-2 gap-2">{children}</div>;
 }
@@ -1030,49 +943,38 @@ function MiniField({ label, children }) {
   );
 }
 
-/* مودال ما بعد الإكمال/التسليم */
-function AfterCompleteModal({
-  open,
-  onClose,
-  onPrint,
-  onWhatsApp,
-  hasWarranty,
+function InputWithVoice({
+  value,
+  onChangeValue,
+  placeholder = "",
+  disabled = false,
+  type = "text",
 }) {
-  if (!open) return null;
+  const handleChange = (e) => {
+    onChangeValue?.(e.target.value);
+  };
+
+  const handleVoiceText = (txt) => {
+    if (!onChangeValue || disabled) return;
+    onChangeValue(txt);
+  };
+
   return (
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-black/40">
-      <div className="bg-white dark:bg-gray-800 w-[420px] max-w-[92vw] rounded-2xl p-4 space-y-3 shadow-xl">
-        <h3 className="text-lg font-semibold">تم إنهاء العملية</h3>
-        <p className="text-sm opacity-80">
-          {hasWarranty
-            ? "هل تودّ طباعة إيصال الضمان أو مراسلة العميل على واتساب؟"
-            : "هل تودّ مراسلة العميل على واتساب؟"}
-        </p>
-        <div
-          className={`grid ${
-            hasWarranty ? "sm:grid-cols-2" : "sm:grid-cols-1"
-          } gap-2`}
-        >
-          {hasWarranty && (
-            <button
-              className="px-3 py-2 rounded-xl bg-emerald-600 text-white"
-              onClick={() => onPrint?.()}
-            >
-              طباعة إيصال الضمان
-            </button>
-          )}
-          <button
-            className="px-3 py-2 rounded-xl bg-green-600 text-white"
-            onClick={() => onWhatsApp?.()}
-          >
-            إرسال رسالة واتساب
-          </button>
-        </div>
-        <div className="flex justify-end">
-          <button className="px-3 py-2 rounded-xl border" onClick={onClose}>
-            إغلاق
-          </button>
-        </div>
+    <div className="relative flex items-center">
+      <input
+        type={type}
+        className="inp w-full pr-10"
+        value={value ?? ""}
+        onChange={handleChange}
+        placeholder={placeholder}
+        disabled={disabled}
+      />
+      <div
+        className={`absolute left-1.5 top-1/2 -translate-y-1/2 ${
+          disabled ? "pointer-events-none opacity-40" : ""
+        }`}
+      >
+        <VoiceInput onText={handleVoiceText} />
       </div>
     </div>
   );

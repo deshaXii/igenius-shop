@@ -1,0 +1,313 @@
+{
+  "jobs": [
+    {
+      "id": "job-1abaffa2-40b5-42fb-8f5f-ad04fc918f34",
+      "date": "2025-12-03",
+      "slot": "day",
+      "start": "07:20",
+      "durationHours": 8,
+      "client": "Post NL",
+      "pickup": "",
+      "dropoff": "",
+      "tractorId": "86afade5-947c-4065-babd-ff1bbffebc39",
+      "trailerId": null,
+      "driverIds": [],
+      "pricing": { "type": "fixed", "value": "" },
+      "notes": "",
+      "revenueTrip": "",
+      "costDriver": "",
+      "costTruck": "",
+      "costDiesel": ""
+    },
+    {
+      "id": "job-98001d48-2edf-481f-9f09-f9a4c493a37e",
+      "date": "2025-12-03",
+      "slot": "day",
+      "start": "09:20",
+      "durationHours": 8,
+      "client": "Post NL",
+      "pickup": "",
+      "dropoff": "",
+      "tractorId": "b22a7a24-4a15-4fd1-8153-7d751ff8cf73",
+      "trailerId": null,
+      "driverIds": ["38e0cd6d-f1ec-4ac5-bd21-6786fd542985"],
+      "pricing": { "type": "fixed", "value": "" },
+      "notes": "",
+      "revenueTrip": "",
+      "costDriver": "",
+      "costTruck": "",
+      "costDiesel": ""
+    },
+    {
+      "id": "job-5a0c0173-92a1-4e4d-bce3-fd0ab512ae62",
+      "date": "2025-12-04",
+      "slot": "day",
+      "start": "09:20",
+      "durationHours": 8,
+      "client": "Post NL",
+      "pickup": "",
+      "dropoff": "",
+      "tractorId": "b22a7a24-4a15-4fd1-8153-7d751ff8cf73",
+      "trailerId": null,
+      "driverIds": ["d2703147-74ae-4997-a935-fb164965438d"],
+      "pricing": { "type": "fixed", "value": "" },
+      "notes": "",
+      "revenueTrip": "",
+      "costDriver": "",
+      "costTruck": "",
+      "costDiesel": ""
+    },
+    {
+      "id": "job-a77dcba9-fee2-477d-ab2a-45a09d4191d9",
+      "date": "2025-12-03",
+      "slot": "day",
+      "start": "08:00",
+      "durationHours": 8,
+      "client": "ACTION",
+      "pickup": "",
+      "dropoff": "",
+      "tractorId": null,
+      "trailerId": null,
+      "driverIds": [],
+      "pricing": { "type": "fixed", "value": "" },
+      "notes": "",
+      "revenueTrip": "",
+      "costDriver": "",
+      "costTruck": "",
+      "costDiesel": ""
+    }
+  ],
+  "drivers": [
+    {
+      "name": "Florin Gagiu",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "d2703147-74ae-4997-a935-fb164965438d",
+      "rating": "0"
+    },
+    {
+      "name": "Catalin Chirila",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "34555851-0119-41b1-92ac-3d69b2e2116f"
+    },
+    {
+      "name": "Perake Machado",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "6f978433-8a14-4d78-9f6b-46776ab0f074"
+    },
+    {
+      "name": "Martin Mika",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "76ca9ba5-c536-4cc6-b7f7-2ee2f3cf1e89"
+    },
+    {
+      "name": "George Dinu",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "18dd2944-7061-4056-af25-a0fbf5243463"
+    },
+    {
+      "name": "Alex Losif",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "168f481c-8caf-420d-aa87-e160c23fa85a"
+    },
+    {
+      "name": "Ion Musca",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "257d950f-79e4-4232-a389-7cf39576e694"
+    },
+    {
+      "name": "Bruno Machado",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "434f9ea1-1141-4b55-a01b-066cbefc9c70"
+    },
+    {
+      "name": "Relu Losif",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "0044cf95-636a-4bc4-bc15-753b9eb838b8"
+    },
+    {
+      "name": "Andrei Cozma",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "25bc58e3-0de0-4828-a370-265c60675fbb"
+    },
+    {
+      "name": "Ioan Gergo Meszar",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "2a2f0577-4054-4a8b-a6cf-274646c46da9"
+    },
+    {
+      "name": "Joao Pedro",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "7768d927-6b29-4219-abee-a247e1d92893"
+    },
+    {
+      "name": "Marius",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "ccd20331-fc97-4914-9134-52d01e68b53b"
+    },
+    {
+      "name": "Telmo",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "f642f388-4694-4168-9e46-02391d6ec47a"
+    },
+    {
+      "name": "Moussa",
+      "canNight": true,
+      "sleepsInCab": true,
+      "doubleMannedEligible": true,
+      "photoUrl": "",
+      "weekAvailability": [0, 1, 2, 3, 4, 5, 6],
+      "leaves": [],
+      "id": "38e0cd6d-f1ec-4ac5-bd21-6786fd542985"
+    }
+  ],
+  "tractors": [
+    {
+      "code": "MAN TGX 2018",
+      "plate": "12-BSV-2",
+      "currentLocation": "",
+      "doubleManned": true,
+      "id": "86afade5-947c-4065-babd-ff1bbffebc39"
+    },
+    {
+      "code": "MAN TGS 2019",
+      "plate": "58-BNG-9",
+      "currentLocation": "",
+      "doubleManned": true,
+      "id": "87c7ae4c-1e74-4c1e-a637-380afedab6d0"
+    },
+    {
+      "code": "SCANIA S460",
+      "plate": "BB-283-R",
+      "currentLocation": "",
+      "doubleManned": true,
+      "id": "b22a7a24-4a15-4fd1-8153-7d751ff8cf73"
+    },
+    {
+      "code": "TRK-NEW",
+      "plate": "BB-072-R",
+      "currentLocation": "",
+      "doubleManned": true,
+      "id": "e1887b1b-565a-4953-ab01-1418ff1de0de"
+    },
+    {
+      "code": "TRK-NEW",
+      "plate": "",
+      "currentLocation": "",
+      "doubleManned": false,
+      "id": "f58fe86e-9163-49a7-a41d-2ccdb9cadc9e"
+    }
+  ],
+  "trailers": [
+    {
+      "code": "TLR-NEW",
+      "plate": "",
+      "type": "box",
+      "id": "35f443df-0d02-42e0-aee1-961080cc15a9",
+      "types": ["box", "box_onderklep_2_asser"]
+    },
+    {
+      "code": "TLR-NEW",
+      "plate": "",
+      "type": "box",
+      "id": "f2f5d9b1-5143-472e-9281-688e81eac944",
+      "types": ["box"]
+    },
+    {
+      "code": "TLR-NEW",
+      "plate": "",
+      "type": "box",
+      "id": "815d1502-fce0-4fb3-b04b-6bf02f5ccad1",
+      "types": ["box"]
+    },
+    {
+      "code": "TLR-NEW",
+      "plate": "",
+      "type": "box",
+      "id": "bf133086-1b14-49eb-9602-af2ff6d31ee0",
+      "types": ["box"]
+    }
+  ],
+  "locations": [],
+  "distanceKm": {},
+  "settings": {
+    "rates": {
+      "emptyKmCost": 0.25,
+      "tractorKmCostLoaded": 0.3,
+      "driverHourCost": 22.5,
+      "nightPremiumPct": 25
+    },
+    "trailerDayCost": { "reefer": 35, "box": 20, "taut": 18, "chassis": 15 }
+  },
+  "weekStart": "2025-12-02",
+  "agenda": []
+}

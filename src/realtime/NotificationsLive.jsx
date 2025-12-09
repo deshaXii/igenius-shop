@@ -17,7 +17,7 @@ function Toast({ n, onClose, onOpen }) {
       <div className="text-xl">🔔</div>
       <div className="flex-1">
         <div className="font-semibold mb-0.5">إشعار جديد</div>
-        <div className="text-sm opacity-90 break-words">
+        <div className="text-sm text-[16px] opacity-90 break-words">
           {n.message || "لديك إشعار جديد"}
         </div>
         <div className="mt-2 flex items-center gap-2">

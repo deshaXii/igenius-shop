@@ -135,7 +135,9 @@ export default function DeliveryModal({
 
         <div className="grid md:grid-cols-4 gap-2">
           <div className="md:col-span-2">
-            <label className="text-sm opacity-80">السعر النهائي *</label>
+            <label className="text-sm text-[16px] opacity-80">
+              السعر النهائي *
+            </label>
             <input
               type="number"
               className="inp w-full"
@@ -145,7 +147,7 @@ export default function DeliveryModal({
             />
           </div>
           <div>
-            <label className="text-sm opacity-80">
+            <label className="text-sm text-[16px] opacity-80">
               السعر المبدئي (اختياري)
             </label>
             <input
@@ -157,7 +159,9 @@ export default function DeliveryModal({
           </div>
           {requirePassword && (
             <div>
-              <label className="text-sm opacity-80">كلمة السر للتأكيد</label>
+              <label className="text-sm text-[16px] opacity-80">
+                كلمة السر للتأكيد
+              </label>
               <input
                 type="password"
                 className="inp w-full"

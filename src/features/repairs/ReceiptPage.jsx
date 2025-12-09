@@ -47,7 +47,9 @@ export default function ReceiptPage() {
   if (loading) {
     return (
       <div className="min-h-screen grid place-items-center">
-        <div className="text-sm opacity-70">جارٍ تجهيز الإيصال…</div>
+        <div className="text-sm text-[16px] opacity-70">
+          جارٍ تجهيز الإيصال…
+        </div>
       </div>
     );
   }

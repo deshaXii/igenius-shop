@@ -5,8 +5,7 @@ import useAuthStore from "../auth/authStore";
 
 /* ================== الإعدادات المرئية ================== */
 const PALETTE = {
-  primary:
-    "bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500 text-white",
+  primary: "bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-500 text-white",
   outline:
     "border border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800",
   card: "bg-white/80 dark:bg-gray-900/80 backdrop-blur border border-slate-200 dark:border-slate-800",
@@ -31,8 +30,7 @@ const STATUS_CLASS = {
   on_hold:
     "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-200",
   cancelled: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
-  unknown:
-    "bg-gray-100 text-gray-800 dark:bg-gray-800/60 dark:text-gray-200",
+  unknown: "bg-gray-100 text-gray-800 dark:bg-gray-800/60 dark:text-gray-200",
 };
 
 /* ====== تطبيع صلاحيات اليوزر (يوحّد الاستلام/الإضافة) ====== */
@@ -56,12 +54,10 @@ function normalizePerms(src) {
   const raw = src || {};
   const out = {};
   for (const k of PERM_KEYS) out[k] = toBool(raw[k] ?? false);
-  // توحيد الاستلام/الإضافة
   if (out.addRepair || out.receiveDevice) {
     out.addRepair = true;
     out.receiveDevice = true;
   }
-  // لو أدمن شامل فعّل الكل (للعرض فقط)
   if (out.adminOverride) {
     for (const k of PERM_KEYS) out[k] = true;
   }
@@ -80,11 +76,9 @@ export default function DepartmentsPage() {
   const [pageLoading, setPageLoading] = useState(true);
   const [pageError, setPageError] = useState("");
 
-  // UI: بحث وفرز
   const [query, setQuery] = useState("");
-  const [sortBy, setSortBy] = useState("name"); // name | techCount
+  const [sortBy, setSortBy] = useState("name");
 
-  // فتح التفاصيل لكل قسم
   const [open, setOpen] = useState(() => {
     try {
       const raw = localStorage.getItem("depOpen.v2");
@@ -94,26 +88,36 @@ export default function DepartmentsPage() {
     }
   });
 
-  // تبويب التفاصيل لكل قسم: techs | repairs
   const [tab, setTab] = useState({});
 
-  // بيانات التفاصيل
   const [techs, setTechs] = useState({});
   const [stats, setStats] = useState({});
   const [repairs, setRepairs] = useState({});
+
   const [picker, setPicker] = useState({});
 
-  // حالات تحميل/أخطاء للأقسام
+  const [unassignedTechs, setUnassignedTechs] = useState([]);
+  const [unassignedLoading, setUnassignedLoading] = useState(false);
+  const [unassignedError, setUnassignedError] = useState("");
+
   const [secLoading, setSecLoading] = useState({});
   const [secError, setSecError] = useState({});
 
-  // مودال إنشاء/تعديل
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ name: "", description: "" });
   const [formBusy, setFormBusy] = useState(false);
 
-  /* -------- تحميل الأقسام -------- */
+  /* -------- Helpers -------- */
+  function isMonitor(dep) {
+    const monitorId = dep?.monitor?._id || dep?.monitor;
+    const myId = user?._id || user?.id;
+    return !!(monitorId && myId && String(monitorId) === String(myId));
+  }
+  function canAssignTech(dep) {
+    return isAdmin || isMonitor(dep);
+  }
+
   async function loadDeps() {
     setPageLoading(true);
     setPageError("");
@@ -126,23 +130,49 @@ export default function DepartmentsPage() {
       setPageLoading(false);
     }
   }
+
+  async function loadUnassigned() {
+    if (!(isAdmin || hasIntake)) return;
+    setUnassignedLoading(true);
+    setUnassignedError("");
+    try {
+      const list = await api
+        .get("/technicians?department=null")
+        .then((r) => r.data);
+      setUnassignedTechs(Array.isArray(list) ? list : []);
+    } catch (e) {
+      console.error("Failed to load unassigned technicians", e);
+      setUnassignedTechs([]);
+      setUnassignedError(
+        e?.response?.data?.message || "تعذر تحميل الفنيين المتاحين"
+      );
+    } finally {
+      setUnassignedLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadDeps();
+    loadUnassigned();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* -------- Helpers للسياسات -------- */
-  function isMonitor(dep) {
-    const monitorId = dep?.monitor?._id || dep?.monitor;
-    const myId = user?._id || user?.id;
-    return !!(monitorId && myId && String(monitorId) === String(myId));
-  }
-  function canAssignTech(dep) {
-    // يُسمح للأدمن أو مُراقب القسم فقط بإضافة فنيين للقسم
-    return isAdmin || isMonitor(dep);
-  }
+  // 🔹 هنا الإصلاح المهم: تحميل تفاصيل الأقسام المفتوحة بعد ما الأقسام تتحمل
+  useEffect(() => {
+    if (!items.length) return;
+    items.forEach((d) => {
+      if (open[d._id]) {
+        if (!techs[d._id]) loadTechs(d._id);
+        if (!stats[d._id]) loadStats(d._id);
+        if (!repairs[d._id]) loadRepairs(d._id, "");
+        if (!tab[d._id]) {
+          setTab((t) => ({ ...t, [d._id]: "techs" }));
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, open]);
 
-  /* -------- تفاصيل القسم -------- */
   function setLoading(depId, key, val) {
     setSecLoading((p) => ({
       ...p,
@@ -163,24 +193,10 @@ export default function DepartmentsPage() {
       const inDept = await api
         .get(`/departments/${depId}/technicians`)
         .then((r) => r.data);
-
-      let unassigned = [];
-      if (allowAssign) {
-        // نجلب غير المعيّنين فقط لو مسموح له يضيف
-        try {
-          unassigned = await api
-            .get(`/technicians?department=null`)
-            .then((r) => r.data);
-        } catch (_) {
-          unassigned = [];
-        }
-      }
-
       setTechs((prev) => ({ ...prev, [depId]: inDept }));
-      setPicker((prev) => ({
-        ...prev,
-        [depId]: { candidateTechId: "", unassigned },
-      }));
+      if (allowAssign) {
+        await loadUnassigned();
+      }
     } catch (e) {
       setError(depId, e?.response?.data?.message || "تعذر تحميل الفنيين");
     } finally {
@@ -190,19 +206,45 @@ export default function DepartmentsPage() {
 
   async function assignTech(depId, techId) {
     if (!techId) return;
-    const dep = items.find((d) => d._id === depId);
-    if (!canAssignTech(dep)) {
-      alert("غير مسموح لك بتعيين فنيين في هذا القسم");
-      return;
-    }
     setLoading(depId, "techs", true);
     try {
       await api.put(`/technicians/${techId}/department`, {
         departmentId: depId,
       });
       await loadTechs(depId);
+      await loadUnassigned();
+      setPicker((prev) => ({
+        ...prev,
+        [depId]: { candidateTechId: "" },
+      }));
     } catch (e) {
       alert(e?.response?.data?.message || "تعذر تعيين الفنّي");
+    } finally {
+      setLoading(depId, "techs", false);
+    }
+  }
+
+  async function unassignTech(depId, techId) {
+    if (!techId) return;
+    if (
+      !window.confirm(
+        "إزالة هذا الفني من القسم؟ سيظل الفني موجودًا ولكن بدون قسم."
+      )
+    ) {
+      return;
+    }
+    setLoading(depId, "techs", true);
+    try {
+      await DepartmentsAPI.unassignTech(depId, techId);
+      await loadTechs(depId);
+      await loadUnassigned();
+      setPicker((prev) => ({
+        ...prev,
+        [depId]: { candidateTechId: "" },
+      }));
+      await loadDeps();
+    } catch (e) {
+      alert(e?.response?.data?.message || "تعذر إزالة الفنّي من القسم");
     } finally {
       setLoading(depId, "techs", false);
     }
@@ -225,11 +267,14 @@ export default function DepartmentsPage() {
       setLoading(depId, "stats", false);
     }
   }
+
   async function loadRepairs(depId, statusFilter = "") {
     setLoading(depId, "repairs", true);
     setError(depId, "");
     try {
-      const qs = statusFilter ? `?status=${encodeURIComponent(statusFilter)}` : "";
+      const qs = statusFilter
+        ? `?status=${encodeURIComponent(statusFilter)}`
+        : "";
       const list = await api
         .get(`/departments/${depId}/repairs${qs}`)
         .then((r) => r.data);
@@ -257,7 +302,6 @@ export default function DepartmentsPage() {
   }
 
   async function setMonitor(depId, userId) {
-    const dep = items.find((d) => d._id === depId);
     if (!isAdmin) {
       alert("تعيين المراقب متاح للأدمن فقط");
       return;
@@ -280,12 +324,12 @@ export default function DepartmentsPage() {
     try {
       await DepartmentsAPI.remove(depId);
       await loadDeps();
+      await loadUnassigned();
     } catch (e) {
       alert(e?.response?.data?.message || "تعذر حذف القسم");
     }
   }
 
-  /* -------- فورم (مودال) -------- */
   function openCreate() {
     if (!isAdmin) return;
     setEditing(null);
@@ -326,7 +370,6 @@ export default function DepartmentsPage() {
     }
   }
 
-  /* -------- بحث/فرز -------- */
   const filtered = useMemo(() => {
     const q = query.trim();
     let arr = items.slice();
@@ -429,6 +472,11 @@ export default function DepartmentsPage() {
           {pageError}
         </div>
       )}
+      {unassignedError && (
+        <div className="p-3 rounded-xl bg-amber-50 text-amber-800 text-sm">
+          {unassignedError}
+        </div>
+      )}
 
       {/* ===== قائمة الأقسام ===== */}
       <div className="grid gap-4">
@@ -442,15 +490,14 @@ export default function DepartmentsPage() {
           filtered.map((d) => {
             const depOpen = !!open[d._id];
             const depTechs = techs[d._id] || [];
-            const depPicker = picker[d._id] || {
-              candidateTechId: "",
-              unassigned: [],
-            };
             const depStats = stats[d._id] || { byStatus: {}, total: 0 };
             const depRep = repairs[d._id] || { list: [], statusFilter: "" };
             const depTab = tab[d._id] || "techs";
             const err = secError[d._id];
             const allowAssign = canAssignTech(d);
+            const depLoading = secLoading[d._id] || {};
+            const monitorId = d?.monitor?._id || d?.monitor;
+            const depPicker = picker[d._id] || { candidateTechId: "" };
 
             return (
               <div
@@ -460,7 +507,7 @@ export default function DepartmentsPage() {
                 {/* رأس البطاقة */}
                 <div className="flex items-start md:items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h2 className="text-lg md:text-xl font-semibold truncate">
                         {d.name}
                       </h2>
@@ -471,12 +518,12 @@ export default function DepartmentsPage() {
                       </span>
                     </div>
                     {d.description && (
-                      <div className="text-sm opacity-70 truncate mt-0.5">
+                      <div className="text-sm text-[16px] opacity-70 truncate mt-0.5">
                         {d.description}
                       </div>
                     )}
-                    <div className="text-xs md:text-sm mt-1">
-                      المراقب:{" "}
+                    <div className="text-xs md:text-sm text-[16px] mt-1 flex flex-wrap items-center gap-1">
+                      <span>المراقب:</span>
                       <b>
                         {d.monitor
                           ? d.monitor.name ||
@@ -534,8 +581,10 @@ export default function DepartmentsPage() {
                         <select
                           className="border rounded-xl px-3 py-2 w-full sm:w-72"
                           defaultValue={d.monitor ? d.monitor._id : ""}
-                          onChange={(e) => setMonitor(d._id, e.target.value || null)}
-                          disabled={!!secLoading[d._id]?.techs}
+                          onChange={(e) =>
+                            setMonitor(d._id, e.target.value || null)
+                          }
+                          disabled={!!depLoading.techs}
                         >
                           <option value="">— بدون مراقب —</option>
                           {depTechs.map((u) => (
@@ -545,9 +594,11 @@ export default function DepartmentsPage() {
                           ))}
                         </select>
                       ) : (
-                        <div className="text-sm opacity-70">
+                        <div className="text-sm text-[16px] opacity-70">
                           {d.monitor
-                            ? d.monitor.name || d.monitor.username || d.monitor.email
+                            ? d.monitor.name ||
+                              d.monitor.username ||
+                              d.monitor.email
                             : "—"}
                         </div>
                       )}
@@ -569,33 +620,47 @@ export default function DepartmentsPage() {
                         {/* إضافة فنّي (أدمن أو مراقب القسم فقط) */}
                         {allowAssign && (
                           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                            <select
-                              className="border rounded-xl px-3 py-2 w-full sm:w-72"
-                              value={depPicker.candidateTechId || ""}
-                              onChange={(e) =>
-                                setPicker((prev) => ({
-                                  ...prev,
-                                  [d._id]: {
-                                    ...depPicker,
-                                    candidateTechId: e.target.value,
-                                  },
-                                }))
-                              }
-                              disabled={!!secLoading[d._id]?.techs}
-                            >
-                              <option value="">— اختر فنّيًا غير معيَّن —</option>
-                              {(depPicker.unassigned || []).map((u) => (
-                                <option key={u._id} value={u._id}>
-                                  {u.name || u.username || u.email}
+                            <div className="flex-1">
+                              <select
+                                className="border rounded-xl px-3 py-2 w-full sm:w-72"
+                                value={depPicker.candidateTechId || ""}
+                                onChange={(e) =>
+                                  setPicker((prev) => ({
+                                    ...prev,
+                                    [d._id]: {
+                                      candidateTechId: e.target.value,
+                                    },
+                                  }))
+                                }
+                                disabled={
+                                  !!depLoading.techs || unassignedLoading
+                                }
+                              >
+                                <option value="">
+                                  — اختر فنّيًا غير معيَّن —
                                 </option>
-                              ))}
-                            </select>
+                                {(unassignedTechs || []).map((u) => (
+                                  <option key={u._id} value={u._id}>
+                                    {u.name || u.username || u.email}
+                                  </option>
+                                ))}
+                              </select>
+                              {!depLoading.techs &&
+                                !unassignedLoading &&
+                                (unassignedTechs || []).length === 0 && (
+                                  <p className="text-[11px] text-amber-600 mt-1">
+                                    لا يوجد فنيون متاحون حاليًا بدون قسم. يمكنك
+                                    إزالة فنّي من قسم آخر ليظهر هنا.
+                                  </p>
+                                )}
+                            </div>
                             <button
                               className={`px-4 py-2 rounded-xl ${PALETTE.primary} disabled:opacity-50`}
-                              onClick={() => assignTech(d._id, depPicker.candidateTechId)}
+                              onClick={() =>
+                                assignTech(d._id, depPicker.candidateTechId)
+                              }
                               disabled={
-                                !depPicker.candidateTechId ||
-                                !!secLoading[d._id]?.techs
+                                !depPicker.candidateTechId || !!depLoading.techs
                               }
                             >
                               إضافة للقسم
@@ -604,7 +669,7 @@ export default function DepartmentsPage() {
                         )}
 
                         {/* جدول/بطاقات الفنيين */}
-                        {secLoading[d._id]?.techs ? (
+                        {depLoading.techs ? (
                           <BlockSkeleton />
                         ) : depTechs.length === 0 ? (
                           <EmptyState text="لا يوجد فنيون في هذا القسم." />
@@ -618,14 +683,41 @@ export default function DepartmentsPage() {
                                     <Th>الاسم</Th>
                                     <Th>البريد</Th>
                                     <Th>الهاتف</Th>
+                                    {allowAssign && <Th>إجراء</Th>}
                                   </tr>
                                 </thead>
                                 <tbody>
                                   {depTechs.map((t) => (
                                     <tr key={t._id} className="border-b">
-                                      <Td>{t.name || t.username || "-"}</Td>
+                                      <Td>
+                                        <div className="flex items-center gap-2">
+                                          <span>
+                                            {t.name || t.username || "-"}
+                                          </span>
+                                          {monitorId &&
+                                            String(monitorId) ===
+                                              String(t._id) && (
+                                              <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                                                مراقب
+                                              </span>
+                                            )}
+                                        </div>
+                                      </Td>
                                       <Td>{t.email || "-"}</Td>
                                       <Td>{t.phone || "-"}</Td>
+                                      {allowAssign && (
+                                        <Td>
+                                          <button
+                                            className="px-2 py-1 text-xs rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                                            onClick={() =>
+                                              unassignTech(d._id, t._id)
+                                            }
+                                            disabled={!!depLoading.techs}
+                                          >
+                                            إزالة من القسم
+                                          </button>
+                                        </Td>
+                                      )}
                                     </tr>
                                   ))}
                                 </tbody>
@@ -639,8 +731,16 @@ export default function DepartmentsPage() {
                                   key={t._id}
                                   className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800"
                                 >
-                                  <div className="font-medium">
-                                    {t.name || t.username || "-"}
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="font-medium">
+                                      {t.name || t.username || "-"}
+                                    </div>
+                                    {monitorId &&
+                                      String(monitorId) === String(t._id) && (
+                                        <span className="px-2 py-0.5 rounded-full text-[10px] bg-indigo-50 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-200">
+                                          مراقب
+                                        </span>
+                                      )}
                                   </div>
                                   <div className="text-xs opacity-70 mt-1">
                                     {t.email || "—"}
@@ -648,6 +748,19 @@ export default function DepartmentsPage() {
                                   <div className="text-xs opacity-70">
                                     {t.phone || "—"}
                                   </div>
+                                  {allowAssign && (
+                                    <div className="mt-2 flex justify-end">
+                                      <button
+                                        className="px-3 py-1 text-xs rounded-lg border border-rose-200 text-rose-700 hover:bg-rose-50 dark:border-rose-500/60 dark:text-rose-300 dark:hover:bg-rose-900/40"
+                                        onClick={() =>
+                                          unassignTech(d._id, t._id)
+                                        }
+                                        disabled={!!depLoading.techs}
+                                      >
+                                        إزالة من القسم
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -657,7 +770,7 @@ export default function DepartmentsPage() {
                     ) : (
                       <section className="grid gap-4">
                         {/* إحصاءات */}
-                        {secLoading[d._id]?.stats ? (
+                        {depLoading.stats ? (
                           <BlockSkeleton />
                         ) : (
                           <div className="flex flex-wrap gap-2">
@@ -691,7 +804,7 @@ export default function DepartmentsPage() {
                         )}
 
                         {/* قائمة الصيانة */}
-                        {secLoading[d._id]?.repairs ? (
+                        {depLoading.repairs ? (
                           <BlockSkeleton />
                         ) : (depRep.list || []).length === 0 ? (
                           <EmptyState text="لا توجد عناصر." />
@@ -763,7 +876,7 @@ export default function DepartmentsPage() {
                                     </div>
                                     <StatusPill s={r.status} />
                                   </div>
-                                  <div className="text-sm mt-1">
+                                  <div className="text-sm text-[16px] mt-1">
                                     {r.device?.model || r.deviceType || "-"} /{" "}
                                     {r.customer?.name || r.customerName || "-"}
                                   </div>
@@ -867,7 +980,7 @@ function Tabs({ value, onChange, items }) {
             <button
               key={t.id}
               onClick={() => onChange?.(t.id)}
-              className={`px-4 py-2 rounded-xl text-sm transition ${
+              className={`px-4 py-2 rounded-xl text-sm text-[16px] transition ${
                 active
                   ? "bg-white dark:bg-gray-900 shadow border border-slate-200 dark:border-slate-700"
                   : "opacity-70 hover:opacity-100"
@@ -886,7 +999,7 @@ function Chip({ children, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-1 rounded-full border text-sm transition ${
+      className={`px-3 py-1 rounded-full border text-sm text-[16px] transition ${
         active
           ? "bg-indigo-600 text-white border-indigo-600"
           : "hover:bg-slate-50 dark:hover:bg-slate-800"

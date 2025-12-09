@@ -2,8 +2,7 @@
 import axios from "axios";
 
 const API = axios.create({
-  baseURL:
-    import.meta.env.VITE_API_URL || "https://igenius-shop-api.vercel.app/api",
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
   withCredentials: true, // ما بيضرش حتى لو مش بتستخدم كوكي
 });
 
@@ -27,9 +26,14 @@ export const DepartmentsAPI = {
     API.put(`/departments/${id}/monitor`, { userId }).then((r) => r.data),
   technicians: (id) =>
     API.get(`/departments/${id}/technicians`).then((r) => r.data),
+  unassignTech: (depId, techId) =>
+    API.delete(`/departments/${depId}/technicians/${techId}`).then(
+      (r) => r.data
+    ),
 };
+
 export const RepairsAPI = {
-  create: (data) => API.post("/repairs", data).then((r) => r.data), // يدعم initialDepartment و technician
+  create: (data) => API.post("/repairs", data).then((r) => r.data),
   timeline: (id) => API.get(`/repairs/${id}/timeline`).then((r) => r.data),
   assignTech: (id, payload) =>
     API.put(`/repairs/${id}/assign-tech`, payload).then((r) => r.data),
@@ -37,6 +41,10 @@ export const RepairsAPI = {
     API.put(`/repairs/${id}/complete-step`, payload).then((r) => r.data),
   moveNext: (id, payload) =>
     API.put(`/repairs/${id}/move-next`, payload).then((r) => r.data),
+
+  // ⭐ جديد: جلب تقييمات العملاء
+  feedbackList: (params) =>
+    API.get("/repairs/feedback", { params }).then((r) => r.data),
 };
 API.interceptors.request.use(async (config) => {
   config.headers ||= {};
@@ -58,10 +66,10 @@ API.interceptors.request.use(async (config) => {
 API.interceptors.response.use(
   (res) => res,
   (err) => {
-    if (err?.response?.status === 401) {
-      // سيبناها هادئة: امسح التوكن، ودي للمسار /login
-      for (const k of TOKEN_KEYS) localStorage.removeItem(k);
-      // اختياري: window.location.replace("/login");
+    const status = err.response?.status;
+    const code = err.response?.data?.error;
+    if (status === 401 && code === "UNAUTHENTICATED") {
+      localStorage.removeItem("token");
     }
     return Promise.reject(err);
   }

@@ -77,7 +77,7 @@ export default function SuppliersPage() {
     if (!window.confirm("هل أنت متأكد من حذف هذا المورد؟")) return;
     try {
       setSaving(true);
-      await fetch(`https://igenius-shop-api.vercel.app/api/suppliers/${id}`, {
+      await fetch(`http://localhost:5000/api/suppliers/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -102,7 +102,7 @@ export default function SuppliersPage() {
               <h1 className="text-2xl md:text-3xl font-bold">الموردون</h1>
               <p className="opacity-90">إدارة الموردين والبحث بسرعة.</p>
             </div>
-            <div className="text-sm opacity-90">
+            <div className="text-sm text-[16px] opacity-90">
               الإجمالي: {loading ? "…" : list.length}
             </div>
           </div>
@@ -171,7 +171,7 @@ export default function SuppliersPage() {
         className={`${UI.card} p-0 shadow-sm overflow-hidden hidden md:block`}
       >
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-separate [border-spacing:0]">
+          <table className="w-full text-sm text-[16px] border-separate [border-spacing:0]">
             <thead className="sticky top-0 bg-white/95 dark:bg-zinc-900/95 shadow-sm">
               <tr className="text-right">
                 <Th>الاسم</Th>
@@ -274,7 +274,7 @@ export default function SuppliersPage() {
                   {s.isShop ? "داخلي" : "خارجي"}
                 </span>
               </div>
-              <div className="text-sm opacity-80 mt-1">
+              <div className="text-sm text-[16px] opacity-80 mt-1">
                 الهاتف:{" "}
                 {s.phone ? (
                   <a

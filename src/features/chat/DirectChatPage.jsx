@@ -137,7 +137,9 @@ export default function DirectChatPage() {
       </header>
 
       <div className="p-2 rounded-xl bg-white dark:bg-gray-800">
-        <label className="text-sm opacity-80">اختر فنيًا سريعًا</label>
+        <label className="text-sm text-[16px] opacity-80">
+          اختر فنيًا سريعًا
+        </label>
         <div className="flex flex-wrap gap-2 mt-2">
           {techs.map((t) => (
             <Link
@@ -161,7 +163,7 @@ export default function DirectChatPage() {
         ref={listRef}
         onScroll={onScroll}
       >
-        <div className="pb-2 text-sm opacity-70">
+        <div className="pb-2 text-sm text-[16px] opacity-70">
           تراسل مع: <span className="font-medium">{peer?.name || "—"}</span>
         </div>
 
@@ -192,7 +194,7 @@ export default function DirectChatPage() {
         <div className="mx-auto -mt-6">
           <button
             onClick={scrollToBottom}
-            className="px-3 py-1.5 rounded-full bg-blue-600 text-white text-sm shadow"
+            className="px-3 py-1.5 rounded-full bg-blue-600 text-white text-sm text-[16px] shadow"
           >
             رسائل جديدة — اضغط للانتقال للأسفل
           </button>

@@ -351,11 +351,11 @@ export default function InvoicesPage() {
                     {v._id.source || "—"}
                   </div>
                 </div>
-                <div className="mt-2 text-sm flex items-center justify-between">
+                <div className="mt-2 text-sm text-[16px] flex items-center justify-between">
                   <span className="opacity-70">عدد القطع</span>
                   <strong>{v.count || 0}</strong>
                 </div>
-                <div className="mt-1 text-sm flex items-center justify-between">
+                <div className="mt-1 text-sm text-[16px] flex items-center justify-between">
                   <span className="opacity-70">إجمالي السعر</span>
                   <strong>{egp(v.total || 0)}</strong>
                 </div>
@@ -369,11 +369,11 @@ export default function InvoicesPage() {
                 <div className="font-semibold">الإجمالي</div>
                 <div className="text-xs opacity-70">—</div>
               </div>
-              <div className="mt-2 text-sm flex items-center justify-between">
+              <div className="mt-2 text-sm text-[16px] flex items-center justify-between">
                 <span className="opacity-70">عدد القطع</span>
                 <strong>{totals.count}</strong>
               </div>
-              <div className="mt-1 text-sm flex items-center justify-between">
+              <div className="mt-1 text-sm text-[16px] flex items-center justify-between">
                 <span className="opacity-70">إجمالي السعر</span>
                 <strong>{egp(totals.totalParts)}</strong>
               </div>
@@ -584,7 +584,7 @@ function Btn({ label, active, onClick }) {
   return (
     <button
       onClick={onClick}
-      className={`px-3 py-2 rounded-xl border text-sm ${
+      className={`px-3 py-2 rounded-xl border text-sm text-[16px] ${
         active
           ? "bg-blue-600 text-white border-blue-600"
           : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700"
@@ -626,7 +626,9 @@ function PartCard({ it, techMap, toggling, onTogglePaid }) {
     <article className="p-3 rounded-xl border border-gray-200 dark:border-gray-700">
       <div className="flex items-start justify-between gap-2">
         <div className="space-y-1">
-          <div className="text-sm font-semibold">{it.part?.name || "—"}</div>
+          <div className="text-sm text-[16px] font-semibold">
+            {it.part?.name || "—"}
+          </div>
           <div className="text-xs opacity-70">
             الصيانة #{it.repairId} • {it.deviceType || "—"}
           </div>

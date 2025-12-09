@@ -258,7 +258,7 @@ export default function TechniciansPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="بحث بالاسم أو اسم المستخدم"
-          className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-sm w-64 max-w-full"
+          className="px-3 py-2 rounded-xl bg-gray-100 dark:bg-gray-700 text-sm text-[16px] w-64 max-w-full"
           aria-label="بحث عن فني"
         />
       </header>
@@ -585,7 +585,7 @@ function TechCard({
               placeholder="اسم الفني"
             />
           ) : (
-            <div className="text-sm font-semibold">{t.name}</div>
+            <div className="text-sm text-[16px] font-semibold">{t.name}</div>
           )}
           <div className="text-xs opacity-70">
             {t.editing ? (

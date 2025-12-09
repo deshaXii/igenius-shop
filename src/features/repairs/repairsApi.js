@@ -2,27 +2,27 @@
 import API from "../../lib/api";
 
 // List (مع فلاتر اختيارية)
-export function listRepairs(params = {}) {
+export async function listRepairs(params = {}) {
   return API.get("/repairs", { params }).then((r) => r.data);
 }
 
 // Get one
-export function getRepair(id) {
+export async function getRepair(id) {
   return API.get(`/repairs/${id}`).then((r) => r.data);
 }
 
 // Create
-export function createRepair(payload) {
+export async function createRepair(payload) {
   return API.post("/repairs", payload).then((r) => r.data);
 }
 
 // Update (عام)
-export function updateRepair(id, payload) {
+export async function updateRepair(id, payload) {
   return API.put(`/repairs/${id}`, payload).then((r) => r.data);
 }
 
 // Update status (فني معيّن: يتطلب password)
-export function updateRepairStatus(
+export async function updateRepairStatus(
   id,
   { status, password, rejectedDeviceLocation }
 ) {
@@ -35,12 +35,22 @@ export function updateRepairStatus(
 }
 
 // Set or update warranty
-export function setWarranty(id, { hasWarranty = true, warrantyEnd, warrantyNotes = "" }) {
+export async function setWarranty(
+  id,
+  { hasWarranty = true, warrantyEnd, warrantyNotes = "" }
+) {
   const body = { hasWarranty, warrantyEnd, warrantyNotes };
   return API.post(`/repairs/${id}/warranty`, body).then((r) => r.data);
 }
 
 // Create customer-facing update
-export function createCustomerUpdate(id, payload) {
-  return API.post(`/repairs/${id}/customer-updates`, payload).then((r) => r.data);
+export async function createCustomerUpdate(id, payload) {
+  return API.post(`/repairs/${id}/customer-updates`, payload)
+    .then((r) => r.data)
+    .catch((err) => {
+      console.log(err);
+      throw new Error(
+        err.response?.data?.message || "حدث خطأ أثناء إرسال التحديث للعميل"
+      );
+    });
 }

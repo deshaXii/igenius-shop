@@ -210,7 +210,7 @@ export default function TechnicianProfilePage() {
 function Card({ title, value }) {
   return (
     <div className="p-3 rounded-xl bg-white dark:bg-gray-800 text-center">
-      <div className="text-sm opacity-70">{title}</div>
+      <div className="text-sm text-[16px] opacity-70">{title}</div>
       <div className="text-2xl font-bold">{value}</div>
     </div>
   );
