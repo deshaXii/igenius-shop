@@ -77,7 +77,7 @@ export default function SuppliersPage() {
     if (!window.confirm("هل أنت متأكد من حذف هذا المورد؟")) return;
     try {
       setSaving(true);
-      await fetch(`http://localhost:5000/api/suppliers/${id}`, {
+      await fetch(`https://igenius-shop-api.vercel.app/api/suppliers/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",

@@ -3,7 +3,7 @@ import axios from "axios";
 import useAuthStore from "../auth/authStore";
 
 const API = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE || "http://localhost:5000/api",
+  baseURL: import.meta.env.VITE_API_BASE || "https://igenius-shop-api.vercel.app/api",
 });
 
 export const fetchNotifications = async (token) => {
