@@ -1,17 +1,11 @@
-import { Fragment, useEffect, useMemo, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import useAuthStore from "../auth/authStore";
-import {
-  getRepair,
-  updateRepair,
-  updateRepairStatus,
-  createCustomerUpdate,
-  setWarranty,
-} from "./repairsApi";
+import { getRepair, updateRepair, updateRepairStatus, createCustomerUpdate, setWarranty } from "./repairsApi";
 import API, { RepairsAPI, DepartmentsAPI } from "../../lib/api";
 import QrAfterCreateModal from "../../components/QrAfterCreateModal";
 import DeliveryModal from "../../components/DeliveryModal";
-import { SHORT_STATUS, STATUS_AR, TYPE_AR } from "../../utils/data";
+import { SHORT_STATUS, STATUS_AR, TYPE_AR, statusToSelectValue, selectValueToStatusPatch } from "../../utils/data";
 import toNum from "../../components/helpers/toNum";
 import numOrDash from "../../components/helpers/numOrDash";
 import AfterCompleteModal from "../../components/AfterCompleteModal";
@@ -28,7 +22,7 @@ export default function SingleRepairPage() {
   const canEditAll = isAdmin || user?.permissions?.editRepair;
 
   const [loading, setLoading] = useState(true);
-  const [setSavingBtn] = useState(false);
+  const [savingBtn, setSavingBtn] = useState(false);
   const [repair, setRepair] = useState(null);
   const [qrOpen, setQrOpen] = useState(false);
   const [deliverOpen, setDeliverOpen] = useState(false);
@@ -42,11 +36,7 @@ export default function SingleRepairPage() {
     flows: [],
     logs: [],
     departmentPriceTotal: 0,
-    acl: {
-      canAssignTech: false,
-      canCompleteCurrent: false,
-      canMoveNext: false,
-    },
+    acl: { canAssignTech: false, canCompleteCurrent: false, canMoveNext: false },
   });
   const [deps, setDeps] = useState([]);
   const [techs, setTechs] = useState([]);
@@ -73,15 +63,38 @@ export default function SingleRepairPage() {
     return techId && uid && String(techId) === String(uid);
   }, [repair, user]);
 
+  const finalStatusMeta = useMemo(() => {
+    const logs = Array.isArray(info.logs) ? info.logs : [];
+    const finalSet = new Set(["تم التسليم", "مكتمل", "مرفوض"]);
+
+    const sorted = [...logs].sort((a, b) => new Date(b?.at || b?.createdAt || 0) - new Date(a?.at || a?.createdAt || 0));
+
+    if (repair?.status && finalSet.has(repair.status)) {
+      const lg = sorted.find((l) => l?.type === "status_change" && l?.payload?.status === repair.status);
+      if (lg) {
+        return {
+          status: lg.payload?.status,
+          by: userLabel(lg.byUser) || (lg.by ? String(lg.by) : "—"),
+          at: lg.at || lg.createdAt || null,
+        };
+      }
+    }
+
+    const lastAnyFinal = sorted.find((l) => l?.type === "status_change" && finalSet.has(l?.payload?.status));
+    if (!lastAnyFinal) return null;
+
+    return {
+      status: lastAnyFinal.payload?.status,
+      by: userLabel(lastAnyFinal.byUser) || (lastAnyFinal.by ? String(lastAnyFinal.by) : "—"),
+      at: lastAnyFinal.at || lastAnyFinal.createdAt || null,
+    };
+  }, [info.logs, repair?.status]);
+
   async function loadRepairBase() {
     try {
       setLoading(true);
       const r = await getRepair(id);
-      const unified = {
-        ...r,
-        price: toNum(r.price) ?? r.price,
-        finalPrice: toNum(r.finalPrice) ?? r.finalPrice,
-      };
+      const unified = { ...r, price: toNum(r.price) ?? r.price, finalPrice: toNum(r.finalPrice) ?? r.finalPrice };
       setRepair(unified);
       setError("");
     } catch (e) {
@@ -96,9 +109,7 @@ export default function SingleRepairPage() {
       const t = await RepairsAPI.timeline(id);
       setInfo(t);
       if (t?.currentDepartment?._id) {
-        const r = await API.get(
-          `/technicians?department=${t.currentDepartment._id}`
-        );
+        const r = await API.get(`/technicians?department=${t.currentDepartment._id}`);
         setTechs(r.data || []);
       } else {
         setTechs([]);
@@ -110,11 +121,7 @@ export default function SingleRepairPage() {
         flows: [],
         logs: [],
         departmentPriceTotal: 0,
-        acl: {
-          canAssignTech: false,
-          canCompleteCurrent: false,
-          canMoveNext: false,
-        },
+        acl: { canAssignTech: false, canCompleteCurrent: false, canMoveNext: false },
       });
       setTechs([]);
     }
@@ -137,23 +144,32 @@ export default function SingleRepairPage() {
     };
     window.addEventListener("repairs:refresh", h);
     return () => window.removeEventListener("repairs:refresh", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function handleStatusPick(nextStatus) {
+  function handleStatusPick(nextValue) {
     if (!repair) return;
+    if (!nextValue) return;
 
-    if (nextStatus === "تم التسليم") {
+    const patch = selectValueToStatusPatch(nextValue);
+
+    if (patch.status === "تم التسليم") {
       setRequirePassword(!canEditAll && isAssigned);
       setDeliverOpen(true);
       return;
     }
 
-    const body = { status: nextStatus };
+    const body = { status: patch.status };
+    if (patch.status === "مرفوض" && patch.rejectedDeviceLocation) {
+      body.rejectedDeviceLocation = patch.rejectedDeviceLocation;
+    }
+
     if (!canEditAll && isAssigned) {
       const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
       if (!password) return;
       body.password = password;
     }
+
     changeStatus(body);
   }
 
@@ -162,12 +178,10 @@ export default function SingleRepairPage() {
     try {
       setSavingBtn(true);
       const updated = await updateRepairStatus(id, body);
-      const norm = {
-        ...updated,
-        price: toNum(updated.price) ?? updated.price,
-        finalPrice: toNum(updated.finalPrice) ?? updated.finalPrice,
-      };
+      const norm = { ...updated, price: toNum(updated.price) ?? updated.price, finalPrice: toNum(updated.finalPrice) ?? updated.finalPrice };
       setRepair(norm);
+
+      await loadTimeline();
 
       if (body?.status === "مكتمل" || body?.status === "تم التسليم") {
         if (norm?.hasWarranty === true && !norm?.warrantyEnd) {
@@ -183,27 +197,6 @@ export default function SingleRepairPage() {
     }
   }
 
-  async function changeRejectedLocation(loc) {
-    try {
-      const body = { status: "مرفوض", rejectedDeviceLocation: loc };
-      if (!canEditAll && isAssigned) {
-        const password = window.prompt(
-          "ادخل كلمة السر لتأكيد تغيير مكان الجهاز"
-        );
-        if (!password) return;
-        body.password = password;
-      }
-      const updated = await updateRepairStatus(id, body);
-      setRepair({
-        ...updated,
-        price: toNum(updated.price) ?? updated.price,
-        finalPrice: toNum(updated.finalPrice) ?? updated.finalPrice,
-      });
-    } catch (e) {
-      alert(e?.response?.data?.message || "فشل تحديث مكان الجهاز");
-    }
-  }
-
   async function submitDelivery(payload) {
     try {
       const parts = (payload.parts || []).map((p) => ({
@@ -211,29 +204,24 @@ export default function SingleRepairPage() {
         cost: p.cost ? Number(p.cost) : 0,
         supplier: p.supplier || undefined,
         source: p.source || undefined,
-        purchaseDate: p.purchaseDate
-          ? new Date(p.purchaseDate).toISOString()
-          : undefined,
+        purchaseDate: p.purchaseDate ? new Date(p.purchaseDate).toISOString() : undefined,
       }));
+
       const body = {
         status: "تم التسليم",
         parts,
         ...(payload.password ? { password: payload.password } : {}),
-        ...(payload.finalPrice !== "" && payload.finalPrice != null
-          ? { finalPrice: Number(payload.finalPrice) }
-          : {}),
-        ...(payload.price !== "" && payload.price != null
-          ? { price: Number(payload.price) }
-          : {}),
+        ...(payload.finalPrice !== "" && payload.finalPrice != null ? { finalPrice: Number(payload.finalPrice) } : {}),
+        ...(payload.price !== "" && payload.price != null ? { price: Number(payload.price) } : {}),
       };
+
       const updated = await updateRepair(id, body);
-      const norm = {
-        ...updated,
-        price: toNum(updated.price) ?? updated.price,
-        finalPrice: toNum(updated.finalPrice) ?? updated.finalPrice,
-      };
+      const norm = { ...updated, price: toNum(updated.price) ?? updated.price, finalPrice: toNum(updated.finalPrice) ?? updated.finalPrice };
+
       setRepair(norm);
       setDeliverOpen(false);
+
+      await loadTimeline();
 
       if (norm?.hasWarranty === true && !norm?.warrantyEnd) {
         setShowWarrantyModal(true);
@@ -246,14 +234,12 @@ export default function SingleRepairPage() {
   }
 
   if (loading) return <div>جارِ التحميل...</div>;
-  if (error)
-    return <div className="p-3 rounded-xl bg-red-50 text-red-800">{error}</div>;
+  if (error) return <div className="p-3 rounded-xl bg-red-50 text-red-800">{error}</div>;
   if (!repair) return <div>الصيانة غير موجودة.</div>;
 
   const cur = info.flows?.length ? info.flows[info.flows.length - 1] : null;
   const isCurrentCompleted = cur && cur.status === "completed";
 
-  // fallback لو PALETTE مش متعرّف
   const CARD =
     (typeof PALETTE !== "undefined" && PALETTE.card) ||
     "bg-white/90 dark:bg-zinc-900/90 border border-slate-200 dark:border-slate-800";
@@ -267,25 +253,18 @@ export default function SingleRepairPage() {
 
   return (
     <div className="space-y-6">
-      {/* ===== Gradient Header ===== */}
       <div className="rounded-3xl overflow-hidden">
         <div className="bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 text-white p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
-              <h1 className="text-2xl md:text-3xl font-bold">
-                صيانة #{repair.repairId ?? "—"}
-              </h1>
-              <p className="opacity-90 mt-1">
-                تابع الحالة والخطوات وأرسل تحديثات للعميل بسهولة.
-              </p>
+              <h1 className="text-2xl md:text-3xl font-bold">صيانة #{repair.repairId ?? "—"}</h1>
+              <p className="opacity-90 mt-1">تابع الحالة والخطوات وأرسل تحديثات للعميل بسهولة.</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => {
                   const token = repair?.publicTracking?.token;
-                  const url = token
-                    ? `${window.location.origin}/t/${token}`
-                    : "";
+                  const url = token ? `${window.location.origin}/t/${token}` : "";
                   if (!url) {
                     alert("لم يتم تفعيل التتبّع بعد.");
                     return;
@@ -298,10 +277,7 @@ export default function SingleRepairPage() {
               </button>
 
               {(isAdmin || user?.permissions?.editRepair) && (
-                <Link
-                  to={`/repairs/${id}/edit`}
-                  className="px-3 py-2 rounded-xl bg-white/90 text-indigo-700 hover:opacity-90"
-                >
+                <Link to={`/repairs/${id}/edit`} className="px-3 py-2 rounded-xl bg-white/90 text-indigo-700 hover:opacity-90">
                   تعديل
                 </Link>
               )}
@@ -314,15 +290,14 @@ export default function SingleRepairPage() {
         </div>
       </div>
 
-      {/* ===== الحالة + معلومات مختصرة ===== */}
-      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
-        <div className="grid md:grid-cols-4 gap-3 items-end">
+      <section className={`p-4 md:p-5 rounded-2xl ${CARD}`}>
+        <div className="grid md:grid-cols-5 gap-3 items-end">
           <div>
             <div className="text-sm text-[16px] opacity-80 mb-1">الحالة</div>
             <select
-              value={repair.status || ""}
+              value={statusToSelectValue(repair)}
               onChange={(e) => handleStatusPick(e.target.value)}
-              disabled={!canEditAll && !isAssigned}
+              disabled={savingBtn || (!canEditAll && !isAssigned)}
               className="px-3 py-2 rounded-xl border w-full"
             >
               <option value="">اختر حالة</option>
@@ -332,42 +307,19 @@ export default function SingleRepairPage() {
                 </option>
               ))}
             </select>
-            {!canEditAll && isAssigned && (
-              <div className="text-xs opacity-70 mt-1">
-                عند اختيار “تم التسليم” سيُطلب كلمة السر.
-              </div>
-            )}
-            {repair.status === "مرفوض" && (
-              <div className="mt-2">
-                <div className="text-sm text-[16px] opacity-80 mb-1">
-                  مكان الجهاز عند الرفض
-                </div>
-                <select
-                  value={repair.rejectedDeviceLocation || "بالمحل"}
-                  onChange={(e) => changeRejectedLocation(e.target.value)}
-                  className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-800 dark:text-red-200"
-                  disabled={!canEditAll && !isAssigned}
-                >
-                  <option value="بالمحل">بالمحل</option>
-                  <option value="مع العميل">مع العميل</option>
-                </select>
-                <div className="text-xs opacity-70 mt-1">
-                  اختيار "مع العميل" يسجّل وقت التسليم تلقائيًا.
-                </div>
-              </div>
-            )}
+
+            {!canEditAll && isAssigned && <div className="text-xs opacity-70 mt-1">عند اختيار “تم التسليم” سيُطلب كلمة السر.</div>}
           </div>
-          <Info
-            label="القسم الحالي"
-            value={info.currentDepartment?.name || "—"}
-          />
+
+          <Info label="القسم الحالي" value={info.currentDepartment?.name || "—"} />
           <Info label="تاريخ الإنشاء" value={formatDate(repair.createdAt)} />
-          <Info label="المستلم" value={repair?.createdBy?.name || "—"} />
+          <Info label="تم الاستلام بواسطة" value={repair?.createdBy?.name || "—"} />
+
+          {finalStatusMeta ? <Info label="آخر تغيير للحالة بواسطة " value={finalStatusMeta.by || "—"} /> : null}
         </div>
       </section>
 
-      {/* ===== التايملاين (الخطوات) ===== */}
-      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+      <section className={`p-4 md:p-5 rounded-2xl ${CARD}`}>
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
@@ -407,7 +359,6 @@ export default function SingleRepairPage() {
 
               return (
                 <div key={f._id} className="flex gap-3">
-                  {/* العمود الرأسي للتايملاين */}
                   <div className="flex flex-col items-center pt-1">
                     <span
                       className={`w-3 h-3 rounded-full ${dotCls}`}
@@ -418,7 +369,6 @@ export default function SingleRepairPage() {
                     )}
                   </div>
 
-                  {/* كارت الخطوة */}
                   <article
                     className={`flex-1 p-3 rounded-2xl border text-sm text-[16px] shadow-[0_4px_10px_rgba(15,23,42,0.04)] ${cardCls}`}
                   >
@@ -475,7 +425,6 @@ export default function SingleRepairPage() {
               );
             })}
 
-            {/* إجمالي تسعير الأقسام */}
             <div className="mt-1 p-3 rounded-xl bg-slate-50 dark:bg-slate-800 text-sm text-[16px] border border-slate-200/70 dark:border-slate-700">
               إجمالي تسعير الأقسام:{" "}
               <b>{Number(info.departmentPriceTotal || 0).toFixed(2)} ج.م</b>
@@ -484,8 +433,7 @@ export default function SingleRepairPage() {
         )}
       </section>
 
-      {/* ===== التحكم في الخطوة الحالية ===== */}
-      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+      <section className={`p-4 md:p-5 rounded-2xl ${CARD}`}>
         <div className="flex items-center justify-between gap-2 mb-2">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
@@ -501,7 +449,6 @@ export default function SingleRepairPage() {
         </p>
 
         <div className="grid gap-3 lg:grid-cols-3">
-          {/* كارت تعيين الفني */}
           <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm text-[16px] font-semibold">
@@ -518,7 +465,9 @@ export default function SingleRepairPage() {
               className="border rounded-lg px-3 py-2 text-sm text-[16px] mt-1"
               value={assignTechId}
               onChange={(e) => setAssignTechId(e.target.value)}
-              disabled={!info.acl?.canAssignTech || !info.currentDepartment}
+              disabled={
+                savingBtn || !info.acl?.canAssignTech || !info.currentDepartment
+              }
             >
               <option value="">— اختر فنّيًا —</option>
               {techs.map((t) => (
@@ -540,13 +489,12 @@ export default function SingleRepairPage() {
                   alert(e?.response?.data?.error || "غير مسموح بتعيين الفني");
                 }
               }}
-              disabled={!info.acl?.canAssignTech}
+              disabled={savingBtn || !info.acl?.canAssignTech}
             >
               تعيين الفنّي / بدء العمل
             </ActionButton>
           </div>
 
-          {/* كارت تسعير وإكمال الخطوة */}
           <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm text-[16px] font-semibold">
@@ -596,6 +544,7 @@ export default function SingleRepairPage() {
                 }
               }}
               disabled={
+                savingBtn ||
                 !info.acl?.canCompleteCurrent ||
                 !cur ||
                 cur.status === "completed"
@@ -603,6 +552,7 @@ export default function SingleRepairPage() {
             >
               تعليم الخطوة كمكتملة + حفظ السعر
             </ActionButton>
+
             {cur && cur.status === "completed" && (
               <div className="text-[11px] opacity-70">
                 هذه الخطوة معلّمة بالفعل كمكتملة.
@@ -610,7 +560,6 @@ export default function SingleRepairPage() {
             )}
           </div>
 
-          {/* كارت نقل للقسم التالي */}
           <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 flex flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
               <div className="text-sm text-[16px] font-semibold">
@@ -636,6 +585,7 @@ export default function SingleRepairPage() {
                 </option>
               ))}
             </select>
+
             <ActionButton
               onClick={async () => {
                 if (!nextDept) return;
@@ -651,12 +601,14 @@ export default function SingleRepairPage() {
                 }
               }}
               disabled={
+                savingBtn ||
                 !info.acl?.canMoveNext ||
                 (!isCurrentCompleted && info.flows?.length > 0)
               }
             >
               نقل الصيانة للقسم التالي
             </ActionButton>
+
             {!isCurrentCompleted && info.flows?.length > 0 && (
               <div className="text-[11px] opacity-70">
                 لا يمكن النقل إلا بعد تعليم الخطوة الحالية كمكتملة.
@@ -666,8 +618,7 @@ export default function SingleRepairPage() {
         </div>
       </section>
 
-      {/* ===== بيانات أساسية ===== */}
-      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+      <section className={`p-4 md:p-5 rounded-2xl ${CARD}`}>
         <h3 className="text-lg font-semibold mb-3">البيانات الأساسية</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <Info label="العميل" value={repair.customerName || "—"} />
@@ -681,8 +632,7 @@ export default function SingleRepairPage() {
         </div>
       </section>
 
-      {/* ===== قطع الغيار المستخدمة ===== */}
-      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+      <section className={`p-4 md:p-5 rounded-2xl ${CARD}`}>
         <div className="flex items-center justify-between gap-2 mb-3">
           <h3 className="text-lg font-semibold flex items-center gap-2">
             <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
@@ -701,7 +651,6 @@ export default function SingleRepairPage() {
           </div>
         ) : (
           <>
-            {/* Desktop table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="min-w-[760px] w-full text-sm text-[16px] text-right">
                 <thead>
@@ -758,7 +707,6 @@ export default function SingleRepairPage() {
               </table>
             </div>
 
-            {/* Mobile cards */}
             <div className="md:hidden grid gap-2">
               {parts.map((p, idx) => (
                 <div
@@ -801,8 +749,7 @@ export default function SingleRepairPage() {
         )}
       </section>
 
-      {/* ===== إرسال تحديث للعميل ===== */}
-      <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
+      <section className={`p-4 md:p-5 rounded-2xl ${CARD}`}>
         <div className="font-semibold mb-2">إرسال تحديث للعميل</div>
         <div className="grid gap-2">
           <label className="text-sm">النوع</label>
@@ -816,6 +763,7 @@ export default function SingleRepairPage() {
             <option value="video">فيديو (رابط)</option>
             <option value="audio">صوت (رابط)</option>
           </select>
+
           {cuType === "text" ? (
             <textarea
               className="border p-2 rounded-xl"
@@ -831,6 +779,7 @@ export default function SingleRepairPage() {
               onChange={(e) => setCuFileUrl(e.target.value)}
             />
           )}
+
           <div className="flex justify-end">
             <button
               disabled={cuSending}
@@ -846,6 +795,7 @@ export default function SingleRepairPage() {
                   alert("تم الإرسال للعميل");
                   setCuText("");
                   setCuFileUrl("");
+                  await loadTimeline();
                 } catch (e) {
                   console.log(e.message);
                 } finally {
@@ -859,9 +809,7 @@ export default function SingleRepairPage() {
         </div>
       </section>
 
-      {/* ===== السجل ===== */}
       <section dir="rtl" className={`p-4 md:p-5 rounded-2xl ${CARD} shadow-sm`}>
-        {/* عنوان وعداد */}
         <div className="flex items-center justify-between gap-3 mb-3">
           <h3 className="font-semibold text-base md:text-lg flex items-center gap-2">
             <span
@@ -875,7 +823,6 @@ export default function SingleRepairPage() {
           </span>
         </div>
 
-        {/* Desktop table */}
         <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800">
           <table className="min-w-[760px] w-full text-sm">
             <thead className="sticky top-0 bg-white/90 dark:bg-zinc-900/90 backdrop-blur supports-[backdrop-filter]:bg-white/70 dark:supports-[backdrop-filter]:bg-zinc-900/70">
@@ -924,6 +871,9 @@ export default function SingleRepairPage() {
                       </span>
                     </td>
                     <td className="py-2.5 px-3">
+                      <div className="text-[12px] opacity-75 mb-1">
+                        بواسطة: <b>{userLabel(lg.byUser) || "—"}</b>
+                      </div>
                       <LogRow log={lg} deps={deps} flows={info.flows} />
                     </td>
                   </tr>
@@ -933,7 +883,6 @@ export default function SingleRepairPage() {
           </table>
         </div>
 
-        {/* Mobile cards */}
         <div className="md:hidden grid gap-2">
           {logsCount === 0 ? (
             <div className="opacity-70">لا يوجد سجل.</div>
@@ -969,6 +918,10 @@ export default function SingleRepairPage() {
                     </span>
                   </header>
 
+                  <div className="text-[11px] opacity-75 mt-1">
+                    بواسطة: <b>{userLabel(lg.byUser) || "—"}</b>
+                  </div>
+
                   <h4 className="text-sm text-[16px] mt-2 font-semibold">
                     {summary}
                   </h4>
@@ -987,13 +940,7 @@ export default function SingleRepairPage() {
         </div>
       </section>
 
-      {/* ===== Modals ===== */}
-      <QrAfterCreateModal
-        open={qrOpen}
-        onClose={() => setQrOpen(false)}
-        trackingUrl={trackingUrl}
-        repair={repair}
-      />
+          <QrAfterCreateModal open={qrOpen} onClose={() => setQrOpen(false)} trackingUrl={trackingUrl} repair={repair} />
 
       <DeliveryModal
         open={deliverOpen}
@@ -1004,62 +951,36 @@ export default function SingleRepairPage() {
         requirePassword={requirePassword}
       />
 
-      {/* مودال اختيار تاريخ الضمان بعد مكتمل/تسليم */}
       {showWarrantyModal && (
         <div className="fixed inset-0 grid place-items-center bg-black/40 z-50">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl w-[380px] space-y-3">
             <h3 className="text-lg font-semibold">حدد تاريخ انتهاء الضمان</h3>
-            <input
-              type="date"
-              className="border p-2 w-full rounded-xl"
-              value={warrantyEnd}
-              onChange={(e) => setWarrantyEnd(e.target.value)}
-            />
+            <input type="date" className="border p-2 w-full rounded-xl" value={warrantyEnd} onChange={(e) => setWarrantyEnd(e.target.value)} />
             <div className="flex gap-2">
-              <button
-                className="px-2 py-1 rounded-xl border"
-                onClick={() => setWarrantyEnd(addDays(7))}
-              >
+              <button className="px-2 py-1 rounded-xl border" onClick={() => setWarrantyEnd(addDays(7))}>
                 أسبوع
               </button>
-              <button
-                className="px-2 py-1 rounded-xl border"
-                onClick={() => setWarrantyEnd(addDays(30))}
-              >
+              <button className="px-2 py-1 rounded-xl border" onClick={() => setWarrantyEnd(addDays(30))}>
                 شهر
               </button>
-              <button
-                className="px-2 py-1 rounded-xl border"
-                onClick={() => setWarrantyEnd(addDays(90))}
-              >
+              <button className="px-2 py-1 rounded-xl border" onClick={() => setWarrantyEnd(addDays(90))}>
                 3 شهور
               </button>
             </div>
             <div className="flex justify-end gap-2">
-              <button
-                className="px-3 py-2 rounded-xl border"
-                onClick={() => setShowWarrantyModal(false)}
-              >
+              <button className="px-3 py-2 rounded-xl border" onClick={() => setShowWarrantyModal(false)}>
                 إلغاء
               </button>
               <button
                 className={`px-3 py-2 rounded-xl ${PALETTE.primary}`}
                 onClick={async () => {
                   if (!warrantyEnd) return;
-                  await setWarranty(repair._id, {
-                    hasWarranty: true,
-                    warrantyEnd,
-                  });
+                  await setWarranty(repair._id, { hasWarranty: true, warrantyEnd });
                   setShowWarrantyModal(false);
                   const r = await getRepair(id);
-                  setRepair({
-                    ...r,
-                    price: toNum(r.price) ?? r.price,
-                    finalPrice: toNum(r.finalPrice) ?? r.finalPrice,
-                  });
-                  if (["مكتمل", "تم التسليم"].includes(r?.status)) {
-                    setAfterCompleteOpen(true);
-                  }
+                  setRepair({ ...r, price: toNum(r.price) ?? r.price, finalPrice: toNum(r.finalPrice) ?? r.finalPrice });
+                  await loadTimeline();
+                  if (["مكتمل", "تم التسليم"].includes(r?.status)) setAfterCompleteOpen(true);
                 }}
               >
                 حفظ
@@ -1069,24 +990,21 @@ export default function SingleRepairPage() {
         </div>
       )}
 
-      {/* مودال ما بعد الإكمال/التسليم */}
       {afterCompleteOpen && (
         <AfterCompleteModal
           open={afterCompleteOpen}
           onClose={() => setAfterCompleteOpen(false)}
-          onPrint={handlePrintReceipt}
-          onWhatsApp={handleWhatsAppMessage}
+          onPrint={() => handlePrintReceipt(repair)}
+          onWhatsApp={() => handleWhatsAppMessage(repair)}
           hasWarranty={!!(repair?.hasWarranty && repair?.warrantyEnd)}
         />
       )}
 
-      {/* Inputs base style (لـ بعض الإنبتس في المودال) */}
       <style>{`.inp{padding:.6rem .8rem;border-radius:.9rem;background:var(--inp-bg,#f3f4f6)}`}</style>
     </div>
   );
 }
 
-/* ===== Small UI helpers ===== */
 function ActionButton({ children, onClick, disabled }) {
   const [busy, setBusy] = useState(false);
   return (
@@ -1115,6 +1033,11 @@ function Info({ label, value, children }) {
       <div className="font-semibold break-words">{v}</div>
     </div>
   );
+}
+
+function userLabel(u) {
+  if (!u) return "";
+  return u.name || u.username || u.email || "";
 }
 
 function addDays(n) {

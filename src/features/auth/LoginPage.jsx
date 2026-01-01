@@ -3,11 +3,14 @@ import React, { useEffect, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import Button from "../../components/Button.jsx";
 import Notification from "../../components/Notification.jsx";
-import axios from "axios";
 import useAuthStore from "./authStore.js";
+import API from "../../lib/api.js";
 
 const LoginPage = () => {
-  const { token, user } = useAuthStore();
+  const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
+  const setAuth = useAuthStore((s) => s.setAuth);
+
   if (token && user) return <Navigate to="/repairs" replace />;
 
   const [username, setUsername] = useState("");
@@ -18,7 +21,6 @@ const LoginPage = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  // --- Prefill from "remember me" ---
   useEffect(() => {
     try {
       const rememberFlag = localStorage.getItem("rememberMe");
@@ -43,17 +45,13 @@ const LoginPage = () => {
         username: username.trim(),
         password,
       };
-      const { data } = await axios.post(
-        "http://localhost:5000/api/auth/login",
-        payload
-      );
 
-      // حفظ البيانات (الواجهة تعتمد على localStorage حالياً)
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      localStorage.setItem("loginTime", Date.now());
+      const { data } = await API.post("/auth/login", payload);
 
-      // تذكر اسم المستخدم فقط (لا نخزّن الباسورد)
+      // ✅ أهم فرق: حدث الـ store (وهو أصلاً بيكتب localStorage جوّاه)
+      setAuth({ token: data.token, user: data.user });
+
+      // remember me logic زي ما هو
       try {
         if (remember) {
           localStorage.setItem("rememberMe", "1");
@@ -75,9 +73,7 @@ const LoginPage = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-600 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Card */}
         <div className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl border border-white/20 dark:border-gray-800 overflow-hidden">
-          {/* Header */}
           <div className="px-6 pt-6 pb-3 text-center">
             <div className="mx-auto h-12 w-12 rounded-2xl bg-indigo-600/10 flex items-center justify-center">
               <svg viewBox="0 0 24 24" className="w-6 h-6 text-indigo-600">
@@ -95,11 +91,9 @@ const LoginPage = () => {
             </p>
           </div>
 
-          {/* Body */}
           <form onSubmit={handleLogin} className="px-6 pb-6 pt-3 space-y-4">
             {error && <Notification type="error" message={error} />}
 
-            {/* Username */}
             <div>
               <label className="block mb-1 text-sm text-[16px] font-medium text-gray-700 dark:text-gray-300">
                 اسم المستخدم أو البريد
@@ -120,7 +114,6 @@ const LoginPage = () => {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="block mb-1 text-sm text-[16px] font-medium text-gray-700 dark:text-gray-300">
                 كلمة المرور
@@ -145,7 +138,6 @@ const LoginPage = () => {
                   className="absolute left-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg text-gray-500 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                   {showPwd ? (
-                    // eye-off
                     <svg viewBox="0 0 24 24" className="w-5 h-5">
                       <path
                         fill="currentColor"
@@ -153,7 +145,6 @@ const LoginPage = () => {
                       />
                     </svg>
                   ) : (
-                    // eye
                     <svg viewBox="0 0 24 24" className="w-5 h-5">
                       <path
                         fill="currentColor"
@@ -165,7 +156,6 @@ const LoginPage = () => {
               </div>
             </div>
 
-            {/* Remember me + submit */}
             <div className="flex items-center justify-between">
               <label className="inline-flex items-center gap-2 text-sm text-[16px] text-gray-700 dark:text-gray-300 select-none">
                 <input
@@ -186,14 +176,12 @@ const LoginPage = () => {
               {submitting ? "جارٍ الدخول…" : "دخول"}
             </Button>
 
-            {/* Tips */}
             <div className="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">
               لأمانك، لا نقوم بحفظ كلمة المرور مطلقًا.
             </div>
           </form>
         </div>
 
-        {/* Footer */}
         <div className="text-center text-white/90 text-xs mt-3">
           v{import.meta?.env?.VITE_APP_VERSION || "1.0"} • Africa/Cairo
         </div>

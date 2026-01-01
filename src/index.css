@@ -279,3 +279,19 @@ body .repairs-filters {
   border-radius: 0;
   border: 1px solid rgb(209 213 219);
 }
+
+@media (max-width: 768px) {
+  .for-smobile {
+    margin: 0;
+  }
+
+  .mobile-public-header {
+    position: relative;
+  }
+
+  span.public-header-tag {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+  }
+}

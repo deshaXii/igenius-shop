@@ -11,6 +11,46 @@ function fmt(d) {
   }
 }
 
+function normalizeFeedbackItem(raw, idx) {
+  const repair =
+    raw?.repair ||
+    raw?.repairDoc ||
+    raw?.repairData ||
+    raw?.repairItem ||
+    raw;
+
+  const fb =
+    raw?.customerFeedback ||
+    raw?.feedback ||
+    repair?.customerFeedback ||
+    repair?.feedback ||
+    {};
+
+  const repairDbId = repair?._id || repair?.id || raw?._id || raw?.id;
+  const repairPublicId = repair?.repairId || raw?.repairId;
+
+  const feedbackDbId =
+    fb?._id || raw?.customerFeedbackId || raw?.feedbackId || null;
+
+  const key = String(
+    feedbackDbId || repairDbId || repairPublicId || raw?.token || idx
+  );
+
+  const hasRating = Number(fb?.rating) >= 1 && Number(fb?.rating) <= 5;
+  const hasNote = !!String(fb?.note || "").trim();
+  const hasFeedback = hasRating || hasNote;
+
+  return {
+    raw,
+    repair,
+    fb,
+    key,
+    hasFeedback,
+    hasRating,
+    hasNote,
+  };
+}
+
 export default function RepairsFeedbackPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -35,60 +75,68 @@ export default function RepairsFeedbackPage() {
     load();
   }, []);
 
+  const normalized = useMemo(() => {
+    return (items || []).map(normalizeFeedbackItem).filter((x) => x.hasFeedback);
+  }, [items]);
+
   const stats = useMemo(() => {
-    const total = items.length;
-    if (!total) return { total: 0, avg: 0, counts: {} };
+    const total = normalized.length;
+    if (!total) return { total: 0, avg: 0, counts: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } };
 
     const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
     let sum = 0;
-    for (const it of items) {
-      const r = it.customerFeedback?.rating || 0;
+    let ratedCount = 0;
+
+    for (const it of normalized) {
+      const r = Number(it.fb?.rating || 0);
       if (r >= 1 && r <= 5) {
         counts[r] = (counts[r] || 0) + 1;
         sum += r;
+        ratedCount += 1;
       }
     }
+
     return {
       total,
-      avg: sum ? sum / total : 0,
+      avg: ratedCount ? sum / ratedCount : 0,
       counts,
     };
-  }, [items]);
+  }, [normalized]);
 
   const filtered = useMemo(() => {
     const term = search.trim().toLowerCase();
-    return items.filter((it) => {
-      const fb = it.customerFeedback || {};
-      const r = fb.rating || 0;
+
+    return normalized.filter((x) => {
+      const fb = x.fb || {};
+      const r = Number(fb.rating || 0);
 
       if (starFilter && r !== starFilter) return false;
 
       if (!term) return true;
 
-      const name = it.customerName || it.clientName || it.customer?.name || "";
+      const rep = x.repair || {};
+
+      const name =
+        rep.customerName || rep.clientName || rep.customer?.name || "";
+
       const device =
-        it.deviceType || it.deviceName || it.model || it.device || "";
-      const problem = it.problemDescription || it.issue || it.problem || "";
+        rep.deviceType || rep.deviceName || rep.model || rep.device || "";
+
+      const problem =
+        rep.problemDescription || rep.issue || rep.problem || "";
 
       const note = fb.note || "";
 
-      const haystack = (
-        name +
-        " " +
-        device +
-        " " +
-        problem +
-        " " +
-        note +
-        " " +
-        (it.repairId || "")
-      )
-        .toString()
-        .toLowerCase();
+      const repairIdentifier =
+        rep.repairId || x.raw?.repairId || rep._id || x.raw?._id || "";
+
+      const haystack = `${name} ${device} ${problem} ${note} ${repairIdentifier}`
+        .toLowerCase()
+        .trim();
 
       return haystack.includes(term);
     });
-  }, [items, search, starFilter]);
+  }, [normalized, search, starFilter]);
 
   if (loading) {
     return <div>جارِ تحميل التقييمات…</div>;
@@ -125,7 +173,7 @@ export default function RepairsFeedbackPage() {
             <div className="flex items-center gap-2">
               <StarRow rating={stats.avg} size={14} />
               <span className="text-sm font-semibold">
-                {stats.avg ? stats.avg.toFixed(1) : "—"}/5
+                {stats.avg ? stats.avg.toFixed(2) : "—"}/5
               </span>
               <span className="text-[11px] text-gray-500">
                 ({stats.total} تقييم)
@@ -135,7 +183,6 @@ export default function RepairsFeedbackPage() {
         </div>
       </header>
 
-      {/* فلاتر */}
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex items-center gap-2 text-xs">
           <span className="text-gray-500">فلترة حسب:</span>
@@ -183,32 +230,39 @@ export default function RepairsFeedbackPage() {
         </div>
       </div>
 
-      {/* قائمة التقييمات */}
       {filtered.length === 0 ? (
         <div className="p-4 rounded-xl bg-white dark:bg-gray-900 border border-dashed border-gray-200 dark:border-gray-700 text-xs text-gray-500">
           لا توجد تقييمات مطابقة للبحث الحالي.
         </div>
       ) : (
         <div className="grid gap-3">
-          {filtered.map((it) => {
-            const fb = it.customerFeedback || {};
-            const rating = fb.rating || 0;
+          {filtered.map((x) => {
+            const rep = x.repair || {};
+            const fb = x.fb || {};
+            const rating = Number(fb.rating || 0);
 
             const name =
-              it.customerName ||
-              it.clientName ||
-              it.customer?.name ||
+              rep.customerName ||
+              rep.clientName ||
+              rep.customer?.name ||
               "عميل بدون اسم";
 
             const device =
-              it.deviceType || it.deviceName || it.model || it.device || "—";
+              rep.deviceType || rep.deviceName || rep.model || rep.device || "—";
 
             const problem =
-              it.problemDescription || it.issue || it.problem || "—";
+              rep.problemDescription || rep.issue || rep.problem || "—";
+
+            const repairNo =
+              rep.repairId ||
+              x.raw?.repairId ||
+              (rep._id ? String(rep._id).slice(-6) : null) ||
+              (x.raw?._id ? String(x.raw._id).slice(-6) : null) ||
+              "—";
 
             return (
               <article
-                key={it._id}
+                key={x.key} // ✅ مفتاح فريد فعلاً
                 className="rounded-2xl bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-3 md:p-4 flex flex-col gap-3"
               >
                 <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -228,10 +282,10 @@ export default function RepairsFeedbackPage() {
                   <div className="ms-auto flex flex-col items-end gap-1">
                     <StarRow rating={rating} size={14} />
                     <span className="text-[11px] text-gray-500">
-                      صيانة #{it.repairId || it._id?.slice(-6) || "—"}
+                      صيانة #{repairNo}
                     </span>
                     <span className="text-[11px] text-gray-400">
-                      {fmt(fb.createdAt || it.createdAt)}
+                      {fmt(fb.createdAt || rep.createdAt || x.raw?.createdAt)}
                     </span>
                   </div>
                 </div>

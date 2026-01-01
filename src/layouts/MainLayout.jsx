@@ -8,7 +8,7 @@ import {
   useNavigate,
 } from "react-router-dom";
 import useAuthStore from "../features/auth/authStore";
-import API from "../lib/api";
+import API from "../lib/api.js";
 import NotificationsLive from "../realtime/NotificationsLive";
 import { enablePush } from "../pwa/pushClient";
 
@@ -59,19 +59,40 @@ export default function MainLayout() {
   }, [location.pathname]);
 
   // تحميل عدد الإشعارات غير المقروءة
+    // تحميل عدد الإشعارات غير المقروءة
   useEffect(() => {
     let alive = true;
+
+    // ✅ لو مفيش token ما تبعتش requests أصلاً
+    const token = (() => {
+      try {
+        return localStorage.getItem("token");
+      } catch {
+        return null;
+      }
+    })();
+
+    if (!token) {
+      setUnreadCount(0);
+      return () => {
+        alive = false;
+      };
+    }
+
     (async () => {
       try {
         const r = await API.get("/notifications/unread-count").then(
           (x) => x.data
         );
         if (alive) setUnreadCount(Number(r?.count || 0));
-      } catch {
+      } catch (err) {
+        // لو 401 هنا معناه التوكن مش راكب/غير صالح
+        // نخليها 0 بدل spam errors
         try {
           const r = await API.get("/notifications", {
             params: { unread: true, limit: 1 },
           }).then((x) => x.data);
+
           if (alive)
             setUnreadCount(
               Array.isArray(r) ? (r.length > 0 ? 1 : 0) : Number(r?.count || 0)
@@ -81,10 +102,12 @@ export default function MainLayout() {
         }
       }
     })();
+
     return () => {
       alive = false;
     };
   }, [location.pathname]);
+
 
   // تفعيل/تطبيق الـ theme (system / light / dark)
   useEffect(() => {
@@ -203,8 +226,8 @@ export default function MainLayout() {
             to="/"
             className="flex items-center gap-3 font-bold tracking-tight text-gray-900 dark:text-gray-50"
           >
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 text-white shadow-sm">
-              <IconLogo />
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl ">
+              <img src="/logo.png" alt="logo" className="logo" />
             </div>
             {!sidebarCollapsed && (
               <div className="flex flex-col">
@@ -370,7 +393,7 @@ function SideLink({ to, icon, children, badge, onClick, collapsed }) {
       <span className="text-lg shrink-0">{icon}</span>
       {!collapsed && <span className="flex-1 truncate">{children}</span>}
       {typeof badge === "number" && badge > 0 && (
-        <span className="ml-auto flex h-5 min-w-[1.5rem] items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+        <span className="ml-auto flex h-5 min-w-[1.5rem] items-center justify-center rounded-full bg-red-600 text-[12px] font-bold text-white">
           {badge > 99 ? "99+" : badge}
         </span>
       )}

@@ -1,24 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import API from "../../lib/api";
-import {
-  listRepairs,
-  updateRepairStatus,
-  updateRepair,
-  setWarranty,
-} from "./repairsApi";
+import { listRepairs, updateRepairStatus, updateRepair, setWarranty } from "./repairsApi";
 import formatDate from "../../utils/formatDate";
 import useAuthStore from "../auth/authStore";
 import DeliveryModal from "../../components/DeliveryModal";
 import WarrantyBadge from "../../components/WarrantyBadge";
-import { SHORT_STATUS } from "../../utils/data";
+import { SHORT_STATUS, displayRepairStatus, statusToSelectValue, selectValueToStatusPatch } from "../../utils/data";
 import { UI } from "../../utils/ui";
 import YmdLocal from "../../components/helpers/ymdLocal";
 import IsOldRepair from "../../components/helpers/isOldRepair";
 import hasNum from "../../components/helpers/hasNum";
-import HandleWhatsAppMessage from "../../components/helpers/handleWhatsAppMessage";
+import handleWhatsAppMessage from "../../components/helpers/handleWhatsAppMessage";
 import IncludeNumberField from "../../components/helpers/IncludeNumberField";
-import HandlePrintReceipt from "../../components/helpers/HandlePrintReceipt";
+import handlePrintReceipt from "../../components/helpers/handlePrintReceipt";
 import AfterCompleteModal from "../../components/AfterCompleteModal";
 
 export default function RepairsPage() {
@@ -50,6 +45,7 @@ export default function RepairsPage() {
     const h = () => load();
     window.addEventListener("repairs:refresh", h);
     return () => window.removeEventListener("repairs:refresh", h);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -59,9 +55,7 @@ export default function RepairsPage() {
       try {
         const { data } = await API.get(`/repairs/${id}`);
         setList((prev) => {
-          const idx = prev.findIndex(
-            (x) => String(x._id || x.id) === String(id)
-          );
+          const idx = prev.findIndex((x) => String(x._id || x.id) === String(id));
           if (idx === -1) return prev;
           const next = prev.slice();
           next[idx] = data;
@@ -75,6 +69,7 @@ export default function RepairsPage() {
     }
     window.addEventListener("repairs:update-one", onUpdateOne);
     return () => window.removeEventListener("repairs:update-one", onUpdateOne);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -84,21 +79,12 @@ export default function RepairsPage() {
   }, [user, navigation]);
 
   const isAdmin = user?.role === "admin" || user?.permissions?.adminOverride;
-  const canViewAll =
-    isAdmin || user?.permissions?.addRepair || user?.permissions?.receiveDevice;
-
+  const canViewAll = isAdmin || user?.permissions?.addRepair || user?.permissions?.receiveDevice;
   const canEditAll = isAdmin || user?.permissions?.editRepair;
   const canAddRepair =
-    isAdmin ||
-    user?.permissions?.adminOverride ||
-    user?.permissions?.addRepair ||
-    user?.permissions?.receiveDevice;
+    isAdmin || user?.permissions?.adminOverride || user?.permissions?.addRepair || user?.permissions?.receiveDevice;
 
-  const canDeleteAll =
-    isAdmin ||
-    user?.permissions?.adminOverride ||
-    user?.permissions?.deleteRepair;
-
+  const canDeleteAll = isAdmin || user?.permissions?.adminOverride || user?.permissions?.deleteRepair;
   const canUseRepairFilters = isAdmin || user?.permissions?.editRepair;
 
   const yesterdayStr = useMemo(() => {
@@ -114,6 +100,14 @@ export default function RepairsPage() {
   }, [deps]);
 
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (error === "Unauthorized" || error === "User not found") {
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      window.location.reload();
+    }
+  }, [error]);
 
   useEffect(() => {
     (async () => {
@@ -148,7 +142,7 @@ export default function RepairsPage() {
     try {
       const params = {};
       if (q) params.q = q;
-      if (status) params.status = status;
+      if (status) params.status = status; // ✅ يدعم "مرفوض في المحل/مع العميل"
       if (canViewAll && technician) params.technician = technician;
       if (quick !== "all") {
         if (startDate) params.startDate = startDate;
@@ -174,9 +168,7 @@ export default function RepairsPage() {
   }, [quick, startDate, endDate, status, technician, q, canViewAll]);
 
   function openDeliverModal(r) {
-    const isAssigned =
-      r.technician &&
-      (r.technician._id || r.technician) === (user?.id || user?._id);
+    const isAssigned = r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
     setDeliverRequirePassword(!canEditAll && isAssigned);
     setDeliverTarget(r);
     setDeliverOpen(true);
@@ -189,9 +181,7 @@ export default function RepairsPage() {
         cost: p.cost ? Number(p.cost) : 0,
         supplier: p.supplier || undefined,
         source: p.source || undefined,
-        purchaseDate: p.purchaseDate
-          ? new Date(p.purchaseDate).toISOString()
-          : undefined,
+        purchaseDate: p.purchaseDate ? new Date(p.purchaseDate).toISOString() : undefined,
       }));
 
       let body = {
@@ -221,32 +211,23 @@ export default function RepairsPage() {
     }
   }
 
-  async function changeStatusInline(r, nextStatus) {
+  async function changeStatusInline(r, nextValue) {
     try {
-      if (nextStatus === "تم التسليم") {
+      if (!nextValue) return;
+
+      const patch = selectValueToStatusPatch(nextValue);
+
+      if (patch.status === "تم التسليم") {
         openDeliverModal(r);
         return;
       }
 
-      if (nextStatus === "مرفوض") {
-        const body = { status: nextStatus };
-        const isAssigned =
-          r.technician &&
-          (r.technician._id || r.technician) === (user?.id || user?._id);
-        if (!canEditAll && isAssigned) {
-          const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
-          if (!password) return;
-          body.password = password;
-        }
-        await updateRepairStatus(r._id, body);
-        await load();
-        return;
+      const body = { status: patch.status };
+      if (patch.status === "مرفوض" && patch.rejectedDeviceLocation) {
+        body.rejectedDeviceLocation = patch.rejectedDeviceLocation;
       }
 
-      const body = { status: nextStatus };
-      const isAssigned =
-        r.technician &&
-        (r.technician._id || r.technician) === (user?.id || user?._id);
+      const isAssigned = r.technician && (r.technician._id || r.technician) === (user?.id || user?._id);
       if (!canEditAll && isAssigned) {
         const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
         if (!password) return;
@@ -256,7 +237,7 @@ export default function RepairsPage() {
       const updated = await updateRepairStatus(r._id, body);
       await load();
 
-      if (nextStatus === "مكتمل") {
+      if (patch.status === "مكتمل") {
         if (updated?.hasWarranty === true && !updated?.warrantyEnd) {
           setWarrantyTarget(updated);
           setShowWarrantyModal(true);
@@ -270,35 +251,9 @@ export default function RepairsPage() {
     }
   }
 
-  async function changeRejectedLocation(r, loc) {
-    try {
-      const isAssigned =
-        r.technician &&
-        (r.technician._id || r.technician) === (user?.id || user?._id);
-
-      const body = { status: "مرفوض", rejectedDeviceLocation: loc };
-      if (!canEditAll && isAssigned) {
-        const password = window.prompt(
-          "ادخل كلمة السر لتأكيد تغيير مكان الجهاز"
-        );
-        if (!password) return;
-        body.password = password;
-      }
-
-      await updateRepairStatus(r._id, body);
-      await load();
-    } catch (e) {
-      alert(e?.response?.data?.message || "حدث خطأ أثناء تحديث مكان الجهاز");
-    }
-  }
-
-  // ====== حذف صيانة ======
   async function handleDelete(r) {
     if (!canDeleteAll) return;
-    const confirm = window.prompt(
-      `للتأكيد اكتب كلمة: حذف\n#${r.repairId} — ${r.deviceType} — ${r.customerName}`,
-      ""
-    );
+    const confirm = window.prompt(`للتأكيد اكتب كلمة: حذف\n#${r.repairId} — ${r.deviceType} — ${r.customerName}`, "");
     if (confirm !== "حذف") return;
     try {
       setDeletingId(r._id);
@@ -311,7 +266,6 @@ export default function RepairsPage() {
     }
   }
 
-  /* ====== إحصاءات سريعة حسب الفلتر الحالي ====== */
   const kpis = useMemo(() => {
     const total = list.length;
     let completed = 0,
@@ -327,14 +281,11 @@ export default function RepairsPage() {
     return { total, completed, delivered, rejected, warranty };
   }, [list]);
 
-  /* ====== UI Components ====== */
   const QuickBtn = ({ label, icon, active, onClick }) => (
     <button
       onClick={onClick}
       className={`flex items-center justify-center gap-2 ${UI.btn} ${
-        active
-          ? "bg-indigo-600 text-white"
-          : `${UI.btnGhost} bg-white dark:bg-gray-900`
+        active ? "bg-indigo-600 text-white" : `${UI.btnGhost} bg-white dark:bg-gray-900`
       }`}
       aria-pressed={active}
     >
@@ -343,22 +294,19 @@ export default function RepairsPage() {
     </button>
   );
 
-  const StatusPill = ({ s }) => {
+  const StatusPill = ({ repair }) => {
+    const s = displayRepairStatus(repair);
     const map = {
       "في الانتظار": "bg-slate-100 text-slate-800 dark:bg-slate-700",
-      "جاري العمل":
-        "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
-      مكتمل:
-        "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200",
-      "تم التسليم":
-        "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200",
+      "جاري العمل": "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200",
+      مكتمل: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200",
+      "تم التسليم": "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200",
+      "مرفوض في المحل": "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
+      "مرفوض مع العميل": "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
+      مرتجع: "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200",
       مرفوض: "bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200",
-      مرتجع:
-        "bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-200",
     };
-    return (
-      <span className={`${UI.pill} ${map[s] || "bg-slate-100"}`}>{s}</span>
-    );
+    return <span className={`${UI.pill} ${map[s] || "bg-slate-100"}`}>{s}</span>;
   };
 
   const SkeletonRow = () => (
@@ -375,9 +323,7 @@ export default function RepairsPage() {
     <div className={`${UI.card} p-6 text-center`}>
       <div className="text-3xl mb-2">🔍</div>
       <div className="font-semibold mb-1">لا توجد نتائج لهذا الفلتر</div>
-      <div className="opacity-70 mb-3 text-sm">
-        جرّب توسيع المدى الزمني أو إزالة بعض الفلاتر.
-      </div>
+      <div className="opacity-70 mb-3 text-sm">جرّب توسيع المدى الزمني أو إزالة بعض الفلاتر.</div>
       {canAddRepair && (
         <Link to="/repairs/new" className={`${UI.btn} ${UI.btnPrimary}`}>
           + إضافة صيانة
@@ -388,7 +334,6 @@ export default function RepairsPage() {
 
   return (
     <div className="space-y-5">
-      {/* ===== هيدر جذاب ===== */}
       <div className="rounded-3xl overflow-hidden">
         <div className="bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 text-white p-5 md:p-7">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -397,17 +342,11 @@ export default function RepairsPage() {
               <p className="opacity-90">عرض وتتبع الحالات مع فلاتر مرنة.</p>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                onClick={load}
-                className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}
-              >
+              <button onClick={load} className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}>
                 تحديث
               </button>
               {canAddRepair && (
-                <Link
-                  to="/repairs/new"
-                  className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}
-                >
+                <Link to="/repairs/new" className={`${UI.btn} bg-white/90 text-indigo-700 hover:opacity-90`}>
                   + إضافة صيانة
                 </Link>
               )}
@@ -416,7 +355,6 @@ export default function RepairsPage() {
         </div>
       </div>
 
-      {/* ===== KPI Cards ===== */}
       <section className="grid grid-cols-2 mb-2 md:grid-cols-5 gap-2">
         <KPI title="الإجمالي" value={kpis.total} />
         <KPI title="مكتمل" value={kpis.completed} tone="emerald" />
@@ -425,10 +363,8 @@ export default function RepairsPage() {
         <KPI title="بضمان" value={kpis.warranty} tone="amber" />
       </section>
 
-      {/* ===== الفلاتر ===== */}
       {canUseRepairFilters && (
         <>
-          {/* زر عائم للموبايل */}
           <button
             onClick={() => setFiltersOpen((v) => !v)}
             className="fixed md:hidden bottom-3 left-1/2 -translate-x-1/2 z-40 w-64 px-4 py-2 rounded-2xl bg-indigo-600 text-white shadow-lg"
@@ -436,15 +372,8 @@ export default function RepairsPage() {
             {filtersOpen ? "إغلاق البحث" : "بحث 🔍"}
           </button>
 
-          {/* Scrim للموبايل */}
-          {filtersOpen && (
-            <div
-              className="fixed inset-0 bg-black/40 z-30 md:hidden"
-              onClick={() => setFiltersOpen(false)}
-            />
-          )}
+          {filtersOpen && <div className="fixed inset-0 bg-black/40 z-30 md:hidden" onClick={() => setFiltersOpen(false)} />}
 
-          {/* Bottom Sheet (Mobile) + Static (Desktop) */}
           <section
             className={`repairs-filters
               ${UI.card} shadow-sm p-3 md:p-4 space-y-3
@@ -454,33 +383,14 @@ export default function RepairsPage() {
               md:mx-0 mx-0
               md:bottom-auto bottom-0
               transition-transform duration-300
-              ${
-                filtersOpen
-                  ? "translate-y-0"
-                  : "translate-y-full md:translate-y-0"
-              }
+              ${filtersOpen ? "translate-y-0" : "translate-y-full md:translate-y-0"}
             `}
           >
             <div className="grid sm:flex sm:flex-wrap gap-2">
               <div className="flex gap-2 grow">
-                <QuickBtn
-                  label="اليوم"
-                  icon="📅"
-                  active={quick === "today"}
-                  onClick={() => applyQuick("today")}
-                />
-                <QuickBtn
-                  label="أمس"
-                  icon="🕓"
-                  active={quick === "yesterday"}
-                  onClick={() => applyQuick("yesterday")}
-                />
-                <QuickBtn
-                  label="جميع الأوقات"
-                  icon="∞"
-                  active={quick === "all"}
-                  onClick={() => applyQuick("all")}
-                />
+                <QuickBtn label="اليوم" icon="📅" active={quick === "today"} onClick={() => applyQuick("today")} />
+                <QuickBtn label="أمس" icon="🕓" active={quick === "yesterday"} onClick={() => applyQuick("yesterday")} />
+                <QuickBtn label="جميع الأوقات" icon="∞" active={quick === "all"} onClick={() => applyQuick("all")} />
               </div>
               <div className="hidden sm:block opacity-60 self-center">أو</div>
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
@@ -505,10 +415,7 @@ export default function RepairsPage() {
                   className={UI.input}
                   aria-label="نهاية المدى الزمني"
                 />
-                <button
-                  onClick={load}
-                  className={`${UI.btn} ${UI.btnPrimary} sm:ml-2`}
-                >
+                <button onClick={load} className={`${UI.btn} ${UI.btnPrimary} sm:ml-2`}>
                   تطبيق
                 </button>
               </div>
@@ -526,12 +433,7 @@ export default function RepairsPage() {
                 />
               </div>
               <div>
-                <select
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value)}
-                  className={UI.input}
-                  aria-label="تصفية بالحالة"
-                >
+                <select value={status} onChange={(e) => setStatus(e.target.value)} className={UI.input} aria-label="تصفية بالحالة">
                   <option value="">كل الحالات</option>
                   {SHORT_STATUS.map((s) => (
                     <option key={s} value={s}>
@@ -542,12 +444,7 @@ export default function RepairsPage() {
               </div>
               {canViewAll && (
                 <div>
-                  <select
-                    value={technician}
-                    onChange={(e) => setTechnician(e.target.value)}
-                    className={UI.input}
-                    aria-label="تصفية بالفني"
-                  >
+                  <select value={technician} onChange={(e) => setTechnician(e.target.value)} className={UI.input} aria-label="تصفية بالفني">
                     <option value="">كل الفنيين</option>
                     {techs.map((t) => (
                       <option key={t._id} value={t._id}>
@@ -562,26 +459,19 @@ export default function RepairsPage() {
         </>
       )}
 
-      {error && (
-        <div className="p-3 rounded-2xl bg-rose-50 text-rose-800">{error}</div>
-      )}
+      {error && <div className="p-3 rounded-2xl bg-rose-50 text-rose-800">{error}</div>}
 
-      {/* ===== الديسكتوب ===== */}
-      <section
-        className={`${UI.card} p-0 shadow-sm overflow-hidden hidden md:block`}
-      >
+      <section className={`${UI.card} p-0 shadow-sm overflow-hidden hidden md:block`}>
         <div className="flex items-center justify-between px-4 pt-3">
-          <div className="text-sm text-[16px] opacity-70">
-            النتائج: {loading ? "…" : list.length}
-          </div>
+          <div className="text-sm text-[16px] opacity-70">النتائج: {loading ? "…" : list.length}</div>
         </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-[16px] border-separate [border-spacing:0]">
             <thead className="sticky top-0 bg-white/95 dark:bg-gray-900/95 shadow-sm">
               <tr className="text-right">
                 <Th>#</Th>
                 <Th>العميل</Th>
-                {/* <Th>الهاتف</Th> */}
                 <Th>الجهاز</Th>
                 <Th>العطل</Th>
                 <Th>اللون</Th>
@@ -610,47 +500,31 @@ export default function RepairsPage() {
                 list.map((r) => {
                   const old = IsOldRepair(r, quick, startDate, endDate);
                   const basePrice = hasNum(r.price) ? Number(r.price) : null;
-                  const finalPrice = hasNum(r.finalPrice)
-                    ? Number(r.finalPrice)
-                    : null;
-                  const depName =
-                    r.currentDepartment?.name ||
-                    depMap.get(String(r.currentDepartment || "")) ||
-                    "—";
+                  const finalPrice = hasNum(r.finalPrice) ? Number(r.finalPrice) : null;
+
+                  const depName = r.currentDepartment?.name || depMap.get(String(r.currentDepartment || "")) || "—";
 
                   return (
                     <tr
                       key={r._id}
                       className={`odd:bg-slate-50 dark:odd:bg-slate-800/40 hover:bg-slate-100/60 dark:hover:bg-slate-800/60 transition ${
-                        r.hasWarranty
-                          ? "bg-amber-50/40 dark:bg-amber-900/10"
-                          : ""
-                      } ${
-                        old ? "ring-1 ring-amber-200 dark:ring-amber-700" : ""
-                      }`}
+                        r.hasWarranty ? "bg-amber-50/40 dark:bg-amber-900/10" : ""
+                      } ${old ? "ring-1 ring-amber-200 dark:ring-amber-700" : ""}`}
                     >
                       <Td>
                         <div className="flex items-center gap-2 whitespace-nowrap">
                           <span className="font-mono">#{r.repairId}</span>
                           {old && (
-                            <span
-                              className={`${UI.pill} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200`}
-                            >
+                            <span className={`${UI.pill} bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200`}>
                               قديمة
                             </span>
                           )}
-                          {r.hasWarranty && (
-                            <WarrantyBadge until={r.warrantyEnd} />
-                          )}
+                          {r.hasWarranty && <WarrantyBadge until={r.warrantyEnd} />}
                         </div>
                       </Td>
                       <Td>{r.customerName}</Td>
-                      {/* <Td>{r.phone || "—"}</Td> */}
                       <Td className="font-medium">{r.deviceType}</Td>
-                      <Td
-                        className="max-w-[240px] truncate"
-                        title={r.issue || ""}
-                      >
+                      <Td className="max-w-[240px] truncate" title={r.issue || ""}>
                         {r.issue || "—"}
                       </Td>
                       <Td>{r.color || "—"}</Td>
@@ -659,13 +533,9 @@ export default function RepairsPage() {
                       <Td>
                         <div className="flex items-center gap-2">
                           <select
-                            value={
-                              SHORT_STATUS.includes(r.status) ? r.status : ""
-                            }
-                            onChange={(e) =>
-                              changeStatusInline(r, e.target.value)
-                            }
-                            className="px-2 py-1 rounded-lg border w-[150px]"
+                            value={statusToSelectValue(r)}
+                            onChange={(e) => changeStatusInline(r, e.target.value)}
+                            className="px-2 py-1 rounded-lg border w-[170px]"
                           >
                             <option value="">— اختر —</option>
                             {SHORT_STATUS.map((s) => (
@@ -674,38 +544,17 @@ export default function RepairsPage() {
                               </option>
                             ))}
                           </select>
-
-                          {r.status === "مرفوض" && (
-                            <select
-                              value={r.rejectedDeviceLocation || "بالمحل"}
-                              onChange={(e) =>
-                                changeRejectedLocation(r, e.target.value)
-                              }
-                              className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-200 mt-1"
-                              aria-label={`مكان الجهاز للصيانة رقم ${r.repairId}`}
-                              title="مكان الجهاز عند الرفض"
-                            >
-                              <option value="بالمحل">بالمحل</option>
-                              <option value="مع العميل">مع العميل</option>
-                            </select>
-                          )}
                         </div>
                       </Td>
                       <Td>{finalPrice ?? basePrice ?? "—"}</Td>
                       <Td>{formatDate(r.createdAt)}</Td>
                       <Td>
                         <div className="flex items-center gap-2">
-                          <Link
-                            to={`/repairs/${r._id}`}
-                            className={`${UI.btn} ${UI.btnGhost}`}
-                          >
+                          <Link to={`/repairs/${r._id}`} className={`${UI.btn} ${UI.btnGhost}`}>
                             فتح
                           </Link>
                           {canEditAll && (
-                            <Link
-                              to={`/repairs/${r._id}/edit`}
-                              className={`${UI.btn} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200`}
-                            >
+                            <Link to={`/repairs/${r._id}/edit`} className={`${UI.btn} bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200`}>
                               تعديل
                             </Link>
                           )}
@@ -731,7 +580,6 @@ export default function RepairsPage() {
         </div>
       </section>
 
-      {/* ===== الموبايل ===== */}
       <section className="md:hidden space-y-2">
         {loading ? (
           <div className={`${UI.card} p-4 animate-pulse h-24`} />
@@ -740,29 +588,15 @@ export default function RepairsPage() {
         ) : (
           list.map((r) => {
             const basePrice = hasNum(r.price) ? Number(r.price) : null;
-            const finalPrice = hasNum(r.finalPrice)
-              ? Number(r.finalPrice)
-              : null;
+            const finalPrice = hasNum(r.finalPrice) ? Number(r.finalPrice) : null;
             const priceLine = finalPrice ?? basePrice ?? "—";
-            const hint =
-              finalPrice !== null &&
-              basePrice !== null &&
-              finalPrice !== basePrice
-                ? ` (مبدئي: ${basePrice})`
-                : "";
-            const depName =
-              r.currentDepartment?.name ||
-              depMap.get(String(r.currentDepartment || "")) ||
-              "—";
+            const hint = finalPrice !== null && basePrice !== null && finalPrice !== basePrice ? ` (مبدئي: ${basePrice})` : "";
+            const depName = r.currentDepartment?.name || depMap.get(String(r.currentDepartment || "")) || "—";
 
             return (
               <div
                 key={r._id}
-                className={`${UI.card} p-3 shadow-sm ${
-                  r.hasWarranty
-                    ? "border-amber-300/60 bg-amber-50/40 dark:bg-amber-900/10"
-                    : ""
-                }`}
+                className={`${UI.card} p-3 shadow-sm ${r.hasWarranty ? "border-amber-300/60 bg-amber-50/40 dark:bg-amber-900/10" : ""}`}
               >
                 <div className="flex items-end justify-between flex-col">
                   <div className="font-bold flex items-center gap-2 whitespace-nowrap">
@@ -771,17 +605,14 @@ export default function RepairsPage() {
                     </span>
                     {r.hasWarranty && <WarrantyBadge until={r.warrantyEnd} />}
                   </div>
-                  <StatusPill s={r.status} />
+                  <StatusPill repair={r} />
                 </div>
 
                 <div className="text-sm text-[16px] opacity-80">
                   {r.customerName} • {r.phone || "—"}
                 </div>
                 <div className="text-xs opacity-70 mt-1">
-                  {r?.technician?.name
-                    ? `الفني: ${r.technician.name}`
-                    : "الفني: —"}{" "}
-                  • القسم: {depName}
+                  {r?.technician?.name ? `الفني: ${r.technician.name}` : "الفني: —"} • القسم: {depName}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
@@ -789,16 +620,13 @@ export default function RepairsPage() {
                   <Info label="اللون" value={r.color || "—"} />
                   <Info label="السعر" value={`${priceLine}${hint}`} />
                   <Info label="إنشاء" value={formatDate(r.createdAt)} />
-                  <Info
-                    label="التسليم"
-                    value={r.deliveryDate ? formatDate(r.deliveryDate) : "—"}
-                  />
+                  <Info label="التسليم" value={r.deliveryDate ? formatDate(r.deliveryDate) : "—"} />
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <div className="flex gap-2 items-center">
                     <select
-                      value={SHORT_STATUS.includes(r.status) ? r.status : ""}
+                      value={statusToSelectValue(r)}
                       onChange={(e) => changeStatusInline(r, e.target.value)}
                       className="px-2 py-1 rounded-lg border"
                     >
@@ -811,32 +639,13 @@ export default function RepairsPage() {
                         </option>
                       ))}
                     </select>
-                    {r.status === "مرفوض" && (
-                      <select
-                        value={r.rejectedDeviceLocation || "بالمحل"}
-                        onChange={(e) =>
-                          changeRejectedLocation(r, e.target.value)
-                        }
-                        className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-900/20 text-rose-800 dark:text-rose-200"
-                        aria-label="مكان الجهاز عند الرفض"
-                      >
-                        <option value="بالمحل">بالمحل</option>
-                        <option value="مع العميل">مع العميل</option>
-                      </select>
-                    )}
                   </div>
 
-                  <Link
-                    to={`/repairs/${r._id}`}
-                    className={`${UI.btn} ${UI.btnGhost}`}
-                  >
+                  <Link to={`/repairs/${r._id}`} className={`${UI.btn} ${UI.btnGhost}`}>
                     فتح
                   </Link>
                   {canEditAll && (
-                    <Link
-                      to={`/repairs/${r._id}/edit`}
-                      className={`${UI.btn} ${UI.btnPrimary}`}
-                    >
+                    <Link to={`/repairs/${r._id}/edit`} className={`${UI.btn} ${UI.btnPrimary}`}>
                       تعديل
                     </Link>
                   )}
@@ -858,7 +667,6 @@ export default function RepairsPage() {
         )}
       </section>
 
-      {/* مودال التسليم */}
       <DeliveryModal
         open={deliverOpen}
         onClose={() => {
@@ -866,28 +674,16 @@ export default function RepairsPage() {
           setDeliverTarget(null);
         }}
         onSubmit={submitDeliver}
-        initialFinalPrice={
-          deliverTarget
-            ? deliverTarget.finalPrice ?? deliverTarget.price ?? 0
-            : 0
-        }
+        initialFinalPrice={deliverTarget ? deliverTarget.finalPrice ?? deliverTarget.price ?? 0 : 0}
         initialParts={deliverTarget ? deliverTarget.parts || [] : []}
         requirePassword={deliverRequirePassword}
       />
 
-      {/* مودال تاريخ الضمان */}
       {showWarrantyModal && (
         <div className="fixed inset-0 grid place-items-center bg-black/40 z-50">
-          <div
-            className={`${UI.card} p-4 w-[380px] max-w-[92vw] space-y-3 shadow-xl`}
-          >
+          <div className={`${UI.card} p-4 w-[380px] max-w-[92vw] space-y-3 shadow-xl`}>
             <h3 className="text-lg font-semibold">حدد تاريخ انتهاء الضمان</h3>
-            <input
-              type="date"
-              className={UI.input}
-              value={warrantyEnd}
-              onChange={(e) => setWarrantyEnd(e.target.value)}
-            />
+            <input type="date" className={UI.input} value={warrantyEnd} onChange={(e) => setWarrantyEnd(e.target.value)} />
             <div className="flex gap-2">
               <button
                 className={`${UI.btn} ${UI.btnGhost}`}
@@ -935,17 +731,12 @@ export default function RepairsPage() {
                 className={`${UI.btn} ${UI.btnPrimary}`}
                 onClick={async () => {
                   if (!warrantyTarget || !warrantyEnd) return;
-                  await setWarranty(warrantyTarget._id, {
-                    hasWarranty: true,
-                    warrantyEnd,
-                  });
+                  await setWarranty(warrantyTarget._id, { hasWarranty: true, warrantyEnd });
                   setShowWarrantyModal(false);
                   setWarrantyEnd("");
 
                   try {
-                    const fresh = await API.get(
-                      `/repairs/${warrantyTarget._id}`
-                    ).then((r) => r.data);
+                    const fresh = await API.get(`/repairs/${warrantyTarget._id}`).then((r) => r.data);
                     setWarrantyTarget(null);
                     if (["مكتمل", "تم التسليم"].includes(fresh?.status)) {
                       setAfterCompleteTarget(fresh);
@@ -968,15 +759,15 @@ export default function RepairsPage() {
         <AfterCompleteModal
           open={afterCompleteOpen}
           onClose={() => setAfterCompleteOpen(false)}
-          onPrint={() => HandlePrintReceipt(afterCompleteTarget)}
-          onWhatsApp={() => HandleWhatsAppMessage(afterCompleteTarget)}
+          onPrint={() => handlePrintReceipt(afterCompleteTarget)}
+          onWhatsApp={() => handleWhatsAppMessage(afterCompleteTarget)}
+          hasWarranty={!!(afterCompleteTarget?.hasWarranty && afterCompleteTarget?.warrantyEnd)}
         />
       )}
     </div>
   );
 }
 
-/* ====== Sub Components ====== */
 function KPI({ title, value, tone = "slate" }) {
   const toneMap = {
     slate: "bg-slate-50 dark:bg-slate-800/50",
@@ -986,9 +777,7 @@ function KPI({ title, value, tone = "slate" }) {
     amber: "bg-amber-50 dark:bg-amber-900/20",
   };
   return (
-    <div
-      className={`rounded-2xl px-4 py-3 ${toneMap[tone]} ${UI.card} border-0`}
-    >
+    <div className={`rounded-2xl px-4 py-3 ${toneMap[tone]} ${UI.card} border-0`}>
       <div className="text-xs opacity-70">{title}</div>
       <div className="text-xl font-bold">{value}</div>
     </div>

@@ -3,10 +3,9 @@ import axios from "axios";
 
 const API = axios.create({
   baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
-  withCredentials: true, // ما بيضرش حتى لو مش بتستخدم كوكي
+  withCredentials: true,
 });
 
-// أين ممكن يكون التوكن مخزّن
 const TOKEN_KEYS = ["token", "accessToken", "jwt"];
 
 function getToken() {
@@ -27,9 +26,7 @@ export const DepartmentsAPI = {
   technicians: (id) =>
     API.get(`/departments/${id}/technicians`).then((r) => r.data),
   unassignTech: (depId, techId) =>
-    API.delete(`/departments/${depId}/technicians/${techId}`).then(
-      (r) => r.data
-    ),
+    API.delete(`/departments/${depId}/technicians/${techId}`).then((r) => r.data),
 };
 
 export const RepairsAPI = {
@@ -41,18 +38,22 @@ export const RepairsAPI = {
     API.put(`/repairs/${id}/complete-step`, payload).then((r) => r.data),
   moveNext: (id, payload) =>
     API.put(`/repairs/${id}/move-next`, payload).then((r) => r.data),
-
-  // ⭐ جديد: جلب تقييمات العملاء
   feedbackList: (params) =>
     API.get("/repairs/feedback", { params }).then((r) => r.data),
 };
+
 API.interceptors.request.use(async (config) => {
   config.headers ||= {};
-  // Authorization
-  const tok = getToken();
-  if (tok) config.headers.Authorization = `Bearer ${tok}`;
 
-  // ↙↙↙ إضافة X-Socket-Id
+  const tok = getToken();
+  if (tok) {
+    config.headers.Authorization = `Bearer ${tok}`;
+    config.headers["x-access-token"] = tok;
+  } else {
+    delete config.headers.Authorization;
+    delete config.headers["x-access-token"];
+  }
+
   try {
     const { getSocketId } = await import("../realtime/socketId");
     const sid = getSocketId();
@@ -61,18 +62,5 @@ API.interceptors.request.use(async (config) => {
 
   return config;
 });
-
-// لو 401 → امسح التوكن وارجع للوجن (اختياري)
-API.interceptors.response.use(
-  (res) => res,
-  (err) => {
-    const status = err.response?.status;
-    const code = err.response?.data?.error;
-    if (status === 401 && code === "UNAUTHENTICATED") {
-      localStorage.removeItem("token");
-    }
-    return Promise.reject(err);
-  }
-);
 
 export default API;

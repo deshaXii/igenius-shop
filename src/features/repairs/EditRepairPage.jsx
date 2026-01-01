@@ -1,3 +1,4 @@
+// src/features/repairs/EditRepairPage.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import API, { RepairsAPI } from "../../lib/api";
@@ -24,10 +25,15 @@ function normalizeLoadedRepair(r) {
     finalPrice: toNum(r.finalPrice) ?? r.finalPrice,
   };
 }
+
 function includeNumberField(obj, key, val) {
   if (val === "" || val === null || val === undefined) return obj;
   const n = Number(val);
   return Number.isFinite(n) ? { ...obj, [key]: n } : obj;
+}
+
+function getIssueFromRepair(r) {
+  return r?.issue || r?.problemDescription || r?.problem || "";
 }
 
 export default function EditRepairPage() {
@@ -36,6 +42,7 @@ export default function EditRepairPage() {
   const { user } = useAuthStore();
   const isAdmin = user?.role === "admin" || user?.permissions?.adminOverride;
   const canEditAll = isAdmin || user?.permissions?.editRepair;
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [deps, setDeps] = useState([]);
@@ -47,6 +54,7 @@ export default function EditRepairPage() {
   const [deliverOpen, setDeliverOpen] = useState(false);
   const [requirePassword, setRequirePassword] = useState(false);
   const [repair, setRepair] = useState(null);
+
   const [form, setForm] = useState({
     customerName: "",
     phone: "",
@@ -65,6 +73,7 @@ export default function EditRepairPage() {
     rejectedDeviceLocation: "",
     currentDepartment: "",
   });
+
   const [hasWarranty, setHasWarranty] = useState(false);
   const [warrantyNotes, setWarrantyNotes] = useState("");
   const [warrantyEnd, setWarrantyEnd] = useState("");
@@ -91,6 +100,7 @@ export default function EditRepairPage() {
         API.get("/departments").then((r) => r.data || []),
         RepairsAPI.timeline(id),
       ]);
+
       const r = normalizeLoadedRepair(r0);
       setRepair(r);
       setDeps(d);
@@ -122,7 +132,7 @@ export default function EditRepairPage() {
         phone: r.phone || "",
         deviceType: r.deviceType || "",
         color: r.color || "",
-        issue: r.issue || "",
+        issue: getIssueFromRepair(r), // ✅ توحيد قراءة المشكلة
         price: r.price ?? "",
         finalPrice: r.finalPrice ?? "",
         technician: r?.technician?._id || r.technician || "",
@@ -132,10 +142,11 @@ export default function EditRepairPage() {
         status: r.status || "",
         createdAt: r.createdAt || "",
         deliveryDate: r.deliveryDate || "",
-        rejectedDeviceLocation: r.rejectedDeviceLocation || "",
+        rejectedDeviceLocation: r.rejectedDeviceLocation || "بالمحل",
         currentDepartment:
           r.currentDepartment?._id || r.currentDepartment || "",
       });
+
       setHasWarranty(!!r.hasWarranty);
       setWarrantyEnd(r.warrantyEnd ? String(r.warrantyEnd).slice(0, 10) : "");
       setWarrantyNotes(r.warrantyNotes || "");
@@ -184,6 +195,7 @@ export default function EditRepairPage() {
       ],
     }));
   }
+
   function updatePart(i, k, v) {
     setForm((prev) => {
       const parts = prev.parts.slice();
@@ -191,6 +203,7 @@ export default function EditRepairPage() {
       return { ...prev, parts };
     });
   }
+
   function removePart(i) {
     setForm((prev) => ({
       ...prev,
@@ -228,10 +241,17 @@ export default function EditRepairPage() {
         phone: form.phone,
         deviceType: form.deviceType,
         color: form.color,
+
+        // ✅ توحيد كتابة المشكلة (علشان أي صفحة تقرأ أي حقل تلاقيه)
         issue: form.issue,
+        problemDescription: form.issue,
+
         technician: form.technician || undefined,
         recipient: form.recipient || undefined,
         notes: form.notes,
+
+        rejectedDeviceLocation: form.rejectedDeviceLocation || undefined,
+
         parts: form.parts.map((p) => ({
           name: p.name,
           cost:
@@ -244,10 +264,12 @@ export default function EditRepairPage() {
             ? new Date(p.purchaseDate).toISOString()
             : undefined,
         })),
+
         hasWarranty,
         ...(warrantyEnd ? { warrantyEnd } : {}),
         ...(warrantyNotes ? { warrantyNotes } : {}),
       };
+
       payload = includeNumberField(payload, "price", form.price);
       payload = includeNumberField(payload, "finalPrice", form.finalPrice);
 
@@ -272,12 +294,18 @@ export default function EditRepairPage() {
     }
 
     if (value === "مرفوض") {
-      const body = { status: "مرفوض" };
+      const body = {
+        status: "مرفوض",
+        // ✅ مهم: ابعت مكان الجهاز عند الرفض
+        rejectedDeviceLocation: form.rejectedDeviceLocation || "بالمحل",
+      };
+
       if (!canEditAll && isAssigned) {
         const password = window.prompt("ادخل كلمة السر لتأكيد تغيير الحالة");
         if (!password) return;
         body.password = password;
       }
+
       try {
         const updated0 = await updateRepairStatus(id, body);
         const updated = normalizeLoadedRepair(updated0);
@@ -296,6 +324,7 @@ export default function EditRepairPage() {
       if (!password) return;
       body.password = password;
     }
+
     try {
       const updated0 = await updateRepairStatus(id, body);
       const updated = normalizeLoadedRepair(updated0);
@@ -382,7 +411,6 @@ export default function EditRepairPage() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-24">
-      {/* ===== Header Gradient ===== */}
       <div className="rounded-3xl overflow-hidden shadow-sm">
         <div className="bg-gradient-to-l from-fuchsia-600 via-violet-600 to-indigo-700 text-white p-6 md:p-8">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
@@ -434,7 +462,6 @@ export default function EditRepairPage() {
         </div>
       </div>
 
-      {/* ===== الحالة + التواريخ ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <div className="grid md:grid-cols-3 gap-3 items-end">
           <div>
@@ -452,11 +479,13 @@ export default function EditRepairPage() {
                 </option>
               ))}
             </select>
+
             {!canEditAll && isAssigned && (
               <div className="text-xs opacity-70 mt-1">
                 عند اختيار “تم التسليم” سيُطلب كلمة السر.
               </div>
             )}
+
             {form.status === "مرفوض" && (
               <div className="mt-2 space-y-1">
                 <div className="text-sm text-[16px] opacity-80">
@@ -485,7 +514,6 @@ export default function EditRepairPage() {
         </div>
       </section>
 
-      {/* ===== توجيه (قسم/فنّي) ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
@@ -525,7 +553,6 @@ export default function EditRepairPage() {
         </div>
       </section>
 
-      {/* ===== معلومات العميل/الجهاز ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <h2 className="text-lg font-semibold mb-3 flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-indigo-500" />
@@ -601,7 +628,6 @@ export default function EditRepairPage() {
         </div>
       </section>
 
-      {/* ===== الضمان ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -612,6 +638,7 @@ export default function EditRepairPage() {
           />
           <span>الصيانة تحت ضمان</span>
         </label>
+
         {hasWarranty && (
           <div className="grid md:grid-cols-2 gap-3 mt-3">
             <div>
@@ -640,7 +667,6 @@ export default function EditRepairPage() {
         )}
       </section>
 
-      {/* ===== قطع الغيار ===== */}
       <section className={`p-4 md:p-5 rounded-2xl ${PALETTE.card}`}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -691,8 +717,7 @@ export default function EditRepairPage() {
                       onChange={(id, obj) => {
                         updatePart(i, "itemId", id);
                         updatePart(i, "itemName", obj?.name || "");
-                        if (!p.name && obj?.name)
-                          updatePart(i, "name", obj.name);
+                        if (!p.name && obj?.name) updatePart(i, "name", obj.name);
                         if (
                           (p.cost === "" || p.cost == null) &&
                           typeof obj?.unitCost === "number"
@@ -778,7 +803,6 @@ export default function EditRepairPage() {
         )}
       </section>
 
-      {/* Desktop Save */}
       <div className="hidden sm:flex items-center gap-2">
         <button
           onClick={submitGeneral}
@@ -794,7 +818,6 @@ export default function EditRepairPage() {
         )}
       </div>
 
-      {/* Mobile sticky save */}
       <div className="sm:hidden h-16" />
       <div className="sm:hidden fixed inset-x-0 bottom-0 z-40">
         <div className="mx-3 mb-3 p-2 rounded-2xl shadow-lg flex items-center gap-2 justify-between bg-white dark:bg-gray-900 border border-slate-200 dark:border-slate-800">
@@ -811,7 +834,6 @@ export default function EditRepairPage() {
         </div>
       </div>
 
-      {/* مودال التسليم */}
       <DeliveryModal
         open={deliverOpen}
         onClose={() => setDeliverOpen(false)}
@@ -821,7 +843,6 @@ export default function EditRepairPage() {
         requirePassword={requirePassword}
       />
 
-      {/* مودال تاريخ الضمان */}
       {showWarrantyModal && (
         <div className="fixed inset-0 grid place-items-center bg-black/40 z-50">
           <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl w-[380px] space-y-3 shadow-xl">
@@ -862,7 +883,6 @@ export default function EditRepairPage() {
         </div>
       )}
 
-      {/* مودال ما بعد الإكمال/التسليم */}
       {afterCompleteOpen && (
         <AfterCompleteModal
           open={afterCompleteOpen}
@@ -902,7 +922,6 @@ export default function EditRepairPage() {
   );
 }
 
-/* ===== عناصر مساعدة للـUI ===== */
 function Field({ label, children }) {
   return (
     <label className="space-y-1 text-sm">
@@ -911,6 +930,7 @@ function Field({ label, children }) {
     </label>
   );
 }
+
 function Info({ label, value }) {
   return (
     <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 text-sm">
@@ -919,6 +939,7 @@ function Info({ label, value }) {
     </div>
   );
 }
+
 function formatDate(d) {
   if (!d) return "—";
   try {
@@ -931,9 +952,11 @@ function formatDate(d) {
     return "—";
   }
 }
+
 function TwoCols({ children }) {
   return <div className="grid grid-cols-2 gap-2">{children}</div>;
 }
+
 function MiniField({ label, children }) {
   return (
     <label className="space-y-1">

@@ -12,6 +12,21 @@ function fmt(d) {
   }
 }
 
+function money(v, currency) {
+  if (v == null) return "—";
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toFixed(2)} ${currency || ""}`.trim();
+}
+
+function ensureExternalUrl(url) {
+  const u = String(url || "").trim();
+  if (!u) return "";
+  if (/^https?:\/\//i.test(u)) return u;
+  if (/^mailto:/i.test(u) || /^tel:/i.test(u)) return u;
+  return `https://${u.replace(/^\/+/, "")}`;
+}
+
 const STATUS_COLOR = {
   "في الانتظار": "bg-amber-100 text-amber-800",
   "جاري العمل": "bg-emerald-100 text-emerald-800",
@@ -29,13 +44,35 @@ const RATING_LABELS = {
   5: "ممتازة",
 };
 
-function normalizePhoneForWhatsApp(phone) {
+function normalizePhoneDigits(phone) {
   return String(phone || "").replace(/\D+/g, "");
+}
+
+function normalizePhoneForWhatsApp(phone) {
+  const digits = normalizePhoneDigits(phone);
+  if (!digits) return "";
+  if (digits.startsWith("00")) return digits.slice(2);
+  if (digits.length === 11 && digits.startsWith("01")) {
+    return `20${digits.slice(1)}`;
+  }
+  return digits;
+}
+
+function getFeedbackFromPayload(payload) {
+  return (
+    payload?.feedback ||
+    payload?.repair?.feedback ||
+    payload?.repair?.customerFeedback ||
+    payload?.repair?.customer_feedback ||
+    payload?.repair?.customer_feedback ||
+    null
+  );
 }
 
 export default function PublicTrackingPage() {
   const { token } = useParams();
   const [data, setData] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [err, setErr] = useState("");
 
   // تقييم العميل
@@ -48,20 +85,35 @@ export default function PublicTrackingPage() {
   async function load() {
     setErr("");
     try {
-      const { data: payload } = await API.get(`/public/repairs/${token}`);
+      const [repairRes, settingsRes] = await Promise.all([
+        API.get(`/public/repairs/${token}`),
+        API.get(`/settings`).catch(() => null),
+      ]);
+
+      const payload = repairRes?.data;
       setData(payload);
 
+      if (settingsRes && settingsRes.data) {
+        setSettings(settingsRes.data);
+      }
+
       // لو فيه تقييم متسجل من قبل في الـ API
-      const fb =
-        payload.feedback ||
-        payload.repair?.feedback ||
-        payload.repair?.customerFeedback;
+      const fb = getFeedbackFromPayload(payload);
+
+      // لو المستخدم بدأ يكتب/يختار نجوم بالفعل، ما نغيّرش عليه أثناء الـ polling
       const hasLocal = rating > 0 || note.trim().length > 0;
 
       if (fb && !hasLocal) {
         setRating(Number(fb.rating || 0));
         setNote(fb.note || "");
         setFeedbackStatus("done");
+        setFeedbackErr("");
+      }
+
+      // لو مفيش تقييم في السيرفر ولسه مفيش إدخال محلي، خلّي الحالة idle
+      if (!fb && !hasLocal) {
+        setFeedbackStatus("idle");
+        setFeedbackErr("");
       }
     } catch (e) {
       setErr("تعذر تحميل بيانات التتبّع");
@@ -69,6 +121,17 @@ export default function PublicTrackingPage() {
   }
 
   useEffect(() => {
+    // ✅ مهم جداً: لما الـ token يتغير لازم نصفر تقييم/ملاحظة
+    setData(null);
+    setSettings(null);
+    setErr("");
+
+    setRating(0);
+    setHoverRating(0);
+    setNote("");
+    setFeedbackStatus("idle");
+    setFeedbackErr("");
+
     load();
     const t = setInterval(load, 30000);
     return () => clearInterval(t);
@@ -87,7 +150,10 @@ export default function PublicTrackingPage() {
         rating,
         note: note.trim(),
       });
+
       setFeedbackStatus("done");
+      // ✅ بعد الحفظ نعمل refresh عشان data تبقى متزامنة
+      await load();
     } catch (e) {
       setFeedbackStatus("error");
       setFeedbackErr(
@@ -137,21 +203,46 @@ export default function PublicTrackingPage() {
     STATUS_COLOR[r.status] ||
     "bg-gray-100 text-gray-800 border border-white/30";
 
-  const phoneNumbers = Array.isArray(shop.phoneNumbers)
+  const settingsPhones = Array.isArray(settings?.phoneNumbers)
+    ? settings.phoneNumbers
+    : [];
+
+  const shopPhones = Array.isArray(shop.phoneNumbers)
     ? shop.phoneNumbers
     : shop.phone
     ? [shop.phone]
     : [];
-  const primaryPhone = phoneNumbers[0];
+
+  const mergedPhones = Array.from(
+    new Set([...shopPhones, ...settingsPhones].filter(Boolean))
+  );
+
+  const primaryPhone = mergedPhones[0];
+
   const whatsappNumber = shop.whatsapp || primaryPhone;
   const whatsappHref = whatsappNumber
     ? `https://wa.me/${normalizePhoneForWhatsApp(whatsappNumber)}`
     : null;
 
-  const socialLinks = Array.isArray(shop.socialLinks) ? shop.socialLinks : [];
+  const settingsSocialLinks = Array.isArray(settings?.socialLinks)
+    ? settings.socialLinks
+    : [];
+
+  const shopSocialLinks = Array.isArray(shop.socialLinks) ? shop.socialLinks : [];
+  const socialLinks = (shopSocialLinks.length ? shopSocialLinks : settingsSocialLinks).filter(
+    (s) => s && (s.url || s.platform)
+  );
 
   const disabledFeedback =
     feedbackStatus === "saving" || feedbackStatus === "done";
+
+  const deptTotal = r.departmentPriceTotal;
+  const finalPrice =
+    Number(r.finalPrice) > 0
+      ? r.finalPrice
+      : Number(deptTotal) > 0
+      ? deptTotal
+      : null;
 
   return (
     <div
@@ -159,10 +250,8 @@ export default function PublicTrackingPage() {
       className="min-h-screen bg-slate-50 dark:bg-gray-950 text-slate-900 dark:text-slate-50"
     >
       <div className="max-w-4xl mx-auto px-3 py-6 md:py-10 space-y-4 md:space-y-6">
-        {/* كارت الهيدر + تفاصيل الصيانة + تقييم */}
         <section className="rounded-3xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
-          {/* هيدر جريدينت */}
-          <div className="bg-gradient-to-l from-blue-700 via-indigo-600 to-sky-500 text-white px-4 md:px-6 py-4 md:py-5 flex flex-col md:flex-row items-start md:items-center gap-4">
+          <div className="mobile-public-header bg-gradient-to-l from-blue-700 via-indigo-600 to-sky-500 text-white px-4 md:px-6 py-4 md:py-5 flex flex-col md:flex-row items-start md:items-center gap-4">
             <div className="flex items-center gap-3">
               {shop.logoUrl ? (
                 <img
@@ -172,7 +261,7 @@ export default function PublicTrackingPage() {
                 />
               ) : (
                 <div className="w-12 h-12 md:w-14 md:h-14 rounded-2xl bg-white/15 flex items-center justify-center text-lg font-bold">
-                  {(shop.name || "IG").slice(0, 2)}
+                  <img src="/logo.png" alt="logo" />
                 </div>
               )}
               <div className="space-y-1">
@@ -190,7 +279,7 @@ export default function PublicTrackingPage() {
               </div>
             </div>
 
-            <div className="ms-auto flex flex-col items-start md:items-end gap-1 text-xs md:text-sm">
+            <div className="ms-auto flex flex-col items-start md:items-end gap-1 text-xs md:text-sm for-smobile">
               <div className="opacity-80">
                 صيانة{" "}
                 <span className="font-semibold">
@@ -201,7 +290,7 @@ export default function PublicTrackingPage() {
                 {r.deviceType || "جهاز غير محدد"}
               </div>
               <span
-                className={`inline-flex items-center mt-1 px-3 py-1 rounded-full text-[11px] font-semibold shadow-sm ${statusChip}`}
+                className={`public-header-tag inline-flex items-center mt-1 px-3 py-1 rounded-full text-[11px] font-semibold shadow-sm ${statusChip}`}
               >
                 {r.status || "—"}
               </span>
@@ -209,14 +298,14 @@ export default function PublicTrackingPage() {
               <div className="flex flex-wrap gap-2 mt-2">
                 {primaryPhone && (
                   <a
-                    href={`tel:${primaryPhone}`}
+                    href={`tel:${normalizePhoneDigits(primaryPhone)}`}
                     className="inline-flex items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-[11px] md:text-xs hover:bg-white/25 transition-colors"
                   >
                     <IconPhone className="w-3.5 h-3.5" />
                     اتصال مباشر
                   </a>
                 )}
-                {whatsappHref && (
+                {whatsappHref && normalizePhoneForWhatsApp(whatsappNumber) && (
                   <a
                     href={whatsappHref}
                     target="_blank"
@@ -231,7 +320,6 @@ export default function PublicTrackingPage() {
             </div>
           </div>
 
-          {/* شريط بيانات المحل / السوشيال */}
           <div className="px-4 md:px-6 py-3 border-b border-slate-100 dark:border-gray-800 text-[11px] md:text-xs text-slate-600 dark:text-slate-300 flex flex-wrap gap-2 md:gap-4">
             {shop.address && (
               <div className="inline-flex items-center gap-1">
@@ -249,38 +337,17 @@ export default function PublicTrackingPage() {
                 <span>{shop.workingHours}</span>
               </div>
             )}
-            {socialLinks.length > 0 && (
-              <div className="inline-flex items-center gap-1 flex-wrap">
-                <span className="font-medium">تابعنا:</span>
-                {socialLinks.map((s, i) => (
-                  <a
-                    key={i}
-                    href={s.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 text-[10px] font-medium"
-                  >
-                    {s.platform || "Social"}
-                  </a>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* جسم الكارت: بيانات الصيانة + التقييم */}
           <div className="px-4 md:px-6 py-4 md:py-5 space-y-4">
-            {/* تفاصيل الصيانة */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
               <Info label="تم الاستلام">{fmt(r.createdAt)}</Info>
               <Info label="بدأ العمل">{fmt(r.startTime)}</Info>
               <Info label="اكتملت">{fmt(r.endTime)}</Info>
               <Info label="تم التسليم">{fmt(r.deliveryDate)}</Info>
-              <Info label="موعد متوقع">{fmt(r.eta)}</Info>
-              <Info label="السعر النهائي">
-                {r.finalPrice != null
-                  ? `${r.finalPrice} ${shop.currency || ""}`.trim()
-                  : "—"}
-              </Info>
+
+              {/* <Info label="إجمالي تسعير الأقسام">{money(deptTotal, shop.currency)}</Info>
+              <Info label="السعر النهائي">{money(finalPrice, shop.currency)}</Info> */}
             </div>
 
             {r.notesPublic && (
@@ -294,7 +361,6 @@ export default function PublicTrackingPage() {
               </div>
             )}
 
-            {/* تقييم العميل */}
             <div className="mt-2 pt-3 border-t border-dashed border-slate-200 dark:border-gray-700">
               <h3 className="text-sm md:text-base font-semibold mb-1">
                 كيف كانت تجربتك معنا؟
@@ -309,7 +375,6 @@ export default function PublicTrackingPage() {
                 className="space-y-3 text-sm"
                 aria-label="نموذج تقييم الخدمة"
               >
-                {/* نجوم التقييم */}
                 <div className="flex flex-wrap items-center gap-2 md:gap-3">
                   <div className="flex">
                     {[1, 2, 3, 4, 5].map((star) => (
@@ -340,7 +405,6 @@ export default function PublicTrackingPage() {
                   </span>
                 </div>
 
-                {/* ملاحظات العميل */}
                 <div>
                   <label className="block text-xs mb-1 text-slate-600 dark:text-slate-300">
                     ملاحظاتك (اختياري)
@@ -373,7 +437,7 @@ export default function PublicTrackingPage() {
                   </button>
                   {feedbackStatus === "done" && (
                     <span className="text-xs text-emerald-600">
-                      شكرًا لك، تم استلام تقييمك بنجاح 🙏
+                      شكرًا لك، تم استلام تقييمك بنجاح.
                     </span>
                   )}
                 </div>
@@ -382,7 +446,6 @@ export default function PublicTrackingPage() {
           </div>
         </section>
 
-        {/* تحديثات الفني */}
         {data?.repair?.updates?.length > 0 && (
           <section className="rounded-3xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
             <div className="px-4 md:px-6 py-3 border-b border-slate-100 dark:border-gray-800">
@@ -444,6 +507,66 @@ export default function PublicTrackingPage() {
             </div>
           </section>
         )}
+
+        {(mergedPhones.length > 0 || socialLinks.length > 0) && (
+          <section className="rounded-3xl bg-white dark:bg-gray-900 shadow-sm border border-slate-100 dark:border-gray-800 overflow-hidden">
+            <div className="px-4 md:px-6 py-3 border-b border-slate-100 dark:border-gray-800">
+              <h2 className="text-sm md:text-base font-semibold">تواصل معنا</h2>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                أرقام الهاتف وروابط السوشيال ميديا.
+              </p>
+            </div>
+
+            <div className="p-4 md:p-5 space-y-4 flex items-center justify-between">
+              {mergedPhones.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    أرقام الهاتف
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {mergedPhones.map((p, i) => {
+                      const digits = normalizePhoneDigits(p);
+                      return (
+                        <a
+                          key={`${digits || p}-${i}`}
+                          href={`tel:${digits || p}`}
+                          className="inline-flex items-center gap-2 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 px-3 py-1.5 text-xs font-semibold"
+                        >
+                          <IconPhone className="w-4 h-4" />
+                          <span dir="ltr">{p}</span>
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {socialLinks.length > 0 && (
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-slate-600 dark:text-slate-300">
+                    السوشيال ميديا
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {socialLinks.map((s, i) => {
+                      const href = ensureExternalUrl(s.url);
+                      return (
+                        <a
+                          key={`${s.platform || "Social"}-${i}`}
+                          href={href}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-gray-800 dark:hover:bg-gray-700 px-3 py-1.5 text-xs font-semibold"
+                        >
+                          {s.platform || "Social"}
+                        </a>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   );
@@ -462,7 +585,6 @@ function Info({ label, children }) {
   );
 }
 
-/* أيقونات صغيرة للاتصال/الموقع/الوقت/النجوم/واتساب */
 function IconPhone({ className = "w-4 h-4" }) {
   return (
     <svg viewBox="0 0 24 24" className={className} fill="currentColor">

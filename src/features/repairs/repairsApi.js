@@ -1,5 +1,6 @@
 // src/features/repairs/repairsApi.js
 import API from "../../lib/api";
+import { selectValueToStatusPatch } from "../../utils/data";
 
 // List (مع فلاتر اختيارية)
 export async function listRepairs(params = {}) {
@@ -22,23 +23,24 @@ export async function updateRepair(id, payload) {
 }
 
 // Update status (فني معيّن: يتطلب password)
-export async function updateRepairStatus(
-  id,
-  { status, password, rejectedDeviceLocation }
-) {
-  const body = { status };
+export async function updateRepairStatus(id, { status, password, rejectedDeviceLocation }) {
+  // ✅ دعم "مرفوض في المحل/مرفوض مع العميل" لو اتبعتوا كما هم
+  const patch = selectValueToStatusPatch(status);
+  const normalizedStatus = patch.status;
+  const normalizedLoc = rejectedDeviceLocation || patch.rejectedDeviceLocation;
+
+  const body = { status: normalizedStatus };
   if (password) body.password = password;
-  if (status === "مرفوض" && rejectedDeviceLocation) {
-    body.rejectedDeviceLocation = rejectedDeviceLocation; // 'بالمحل' أو 'مع العميل'
+
+  if (normalizedStatus === "مرفوض" && normalizedLoc) {
+    body.rejectedDeviceLocation = normalizedLoc; // 'بالمحل' أو 'مع العميل'
   }
+
   return API.put(`/repairs/${id}`, body).then((r) => r.data);
 }
 
 // Set or update warranty
-export async function setWarranty(
-  id,
-  { hasWarranty = true, warrantyEnd, warrantyNotes = "" }
-) {
+export async function setWarranty(id, { hasWarranty = true, warrantyEnd, warrantyNotes = "" }) {
   const body = { hasWarranty, warrantyEnd, warrantyNotes };
   return API.post(`/repairs/${id}/warranty`, body).then((r) => r.data);
 }
@@ -49,8 +51,6 @@ export async function createCustomerUpdate(id, payload) {
     .then((r) => r.data)
     .catch((err) => {
       console.log(err);
-      throw new Error(
-        err.response?.data?.message || "حدث خطأ أثناء إرسال التحديث للعميل"
-      );
+      throw new Error(err.response?.data?.message || "حدث خطأ أثناء إرسال التحديث للعميل");
     });
 }

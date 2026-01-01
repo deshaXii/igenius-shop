@@ -1,5 +1,5 @@
 // src/features/backup/BackupPage.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import API from "../../lib/api";
 import formatDate from "../../utils/formatDate";
 
@@ -8,7 +8,15 @@ export default function BackupPage() {
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [err, setErr] = useState("");
-  const [wa, setWa] = useState(() => localStorage.getItem("wa_number") || ""); // رقم واتساب
+
+  // Restore state
+  const fileRef = useRef(null);
+  const [restoreFile, setRestoreFile] = useState(null);
+  const [restoreReplace, setRestoreReplace] = useState(true);
+  const [restoreMsg, setRestoreMsg] = useState("");
+  const [restoreErr, setRestoreErr] = useState("");
+  const [ensureSeedAdmin, setEnsureSeedAdmin] = useState(true);
+  const [resetSeedPassword, setResetSeedPassword] = useState(false);
 
   useEffect(() => {
     load();
@@ -27,14 +35,6 @@ export default function BackupPage() {
     }
   }
 
-  function saveWa(v) {
-    setWa(v);
-    try {
-      localStorage.setItem("wa_number", v || "");
-    } catch {}
-  }
-
-  // تنزيل ملف (blob) باسم معيّن
   function downloadBlob(blob, filename = "backup.json.gz") {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -48,20 +48,17 @@ export default function BackupPage() {
     }, 0);
   }
 
-  // ➊ نسخ + تنزيل الآن (بدون تخزين خارجي)
   async function backupAndDownload() {
     setRunning(true);
     try {
       const res = await API.post("/backup/run-download", null, {
         responseType: "blob",
       });
-      // اسم الملف من الهيدر لو متاح
       const cd = res.headers?.["content-disposition"] || "";
       const m = cd.match(/filename="([^"]+)"/);
       const name = m ? m[1] : "backup.json.gz";
       downloadBlob(res.data, name);
-      // حدّث الإحصائيات بعد النجاح
-      load();
+      await load();
     } catch (e) {
       alert(e?.response?.data?.message || "فشل إنشاء/تنزيل النسخة الاحتياطية");
     } finally {
@@ -69,91 +66,96 @@ export default function BackupPage() {
     }
   }
 
-  // ضيف الدالة دي فوق داخل نفس الملف
-  function normalizePhone(raw) {
-    let p = String(raw || "").trim();
-    p = p.replace(/\D/g, ""); // امسح أي رموز غير أرقام
-    if (p.startsWith("00")) p = p.slice(2);
-    // تصحيح شائع: 20 + 0xxxx -> 20 + xxxx
-    if (p.startsWith("20") && p.length >= 12 && p[2] === "0") {
-      p = "20" + p.slice(3);
+  // ====== Size formatting (Bytes/KB/MB/GB) ======
+  function formatBytes(bytes) {
+    if (bytes == null) return "—";
+    const n = Number(bytes);
+    if (!Number.isFinite(n) || n < 0) return "—";
+
+    const KB = 1024;
+    const MB = KB * 1024;
+    const GB = MB * 1024;
+
+    if (n < KB) return `${n.toFixed(0)} ب`;
+    if (n < MB) return `${(n / KB).toFixed(2)} ك.ب`;
+    if (n < GB) return `${(n / MB).toFixed(2)} م.ب`;
+    return `${(n / GB).toFixed(2)} ج.ب`;
+  }
+
+  function pickBytes(kind) {
+    if (!data) return null;
+    const map = {
+      data: ["dataSizeBytes"],
+      storage: ["storageSizeBytes"],
+      index: ["indexSizeBytes"],
+      total: ["totalSizeBytes"],
+    };
+    const keys = map[kind] || [];
+    for (const k of keys) {
+      if (data[k] != null) return data[k];
     }
-    return p;
+    // fallback لو لسه بيرجع MB فقط
+    const mbKey =
+      kind === "data"
+        ? "dataSizeMB"
+        : kind === "storage"
+        ? "storageSizeMB"
+        : kind === "index"
+        ? "indexSizeMB"
+        : "totalSizeMB";
+    if (data[mbKey] != null) return Number(data[mbKey]) * 1024 * 1024;
+    return null;
   }
 
-  function openWhatsAppLink(phone, text) {
-    const link = phone
-      ? `https://wa.me/${encodeURIComponent(phone)}?text=${encodeURIComponent(
-          text
-        )}`
-      : `https://wa.me/?text=${encodeURIComponent(text)}`;
+  async function restoreFromBackup() {
+    setRestoreMsg("");
+    setRestoreErr("");
 
-    // افتح في تبويب جديد بطريقة تقلل حجب البوب-أب
-    const a = document.createElement("a");
-    a.href = link;
-    a.target = "_blank";
-    a.rel = "noopener";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => a.remove(), 0);
-  }
+    if (!restoreFile) {
+      setRestoreErr("اختر ملف النسخة الاحتياطية أولاً.");
+      return;
+    }
 
-  // استبدل دالة backupAndWhatsapp بالكامل بهذه:
-  async function backupAndWhatsapp() {
+    const dangerText = restoreReplace
+      ? "تحذير: سيتم مسح البيانات الحالية ثم استرجاع البيانات من الملف. هل أنت متأكد؟"
+      : "سيتم دمج البيانات (قد يحدث تعارض/تكرار). هل أنت متأكد؟";
+
+    if (!confirm(dangerText)) return;
+
     setRunning(true);
     try {
-      const res = await API.post("/backup/run-download", null, {
-        responseType: "blob",
-      });
-      const cd = res.headers?.["content-disposition"] || "";
-      const m = cd.match(/filename="([^"]+)"/);
-      const name = m ? m[1] : "backup.json.gz";
-      const blob = res.data;
+      const fd = new FormData();
+      fd.append("file", restoreFile);
+      fd.append("replace", restoreReplace ? "1" : "0");
+      fd.append("ensureSeedAdmin", ensureSeedAdmin ? "1" : "0");
+      fd.append("resetSeedPassword", resetSeedPassword ? "1" : "0");
 
-      // جرّب Web Share لو مدعوم وبملف صغير نسبيًا
-      let shared = false;
-      const phone = normalizePhone(wa);
-      const shareText = `تم إنشاء نسخة احتياطية بإسم ${name}. إذا لم يُرفق الملف تلقائيًا، ستجده محمّلًا على جهازك.`;
+      const r = await API.post("/backup/restore", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      }).then((x) => x.data);
 
-      try {
-        const file = new File([blob], name, {
-          type: "application/octet-stream",
-        }); // نوع عام لزيادة التوافق
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            title: "نسخة احتياطية",
-            text: shareText,
-            files: [file],
-          });
-          shared = true;
-        }
-      } catch (e) {
-        // لو المشاركة فشلت لأي سبب، هنكمل بالفولباك
-        console.debug("Web Share failed, falling back to download + wa.me:", e);
-      }
+      const seedInfo = r?.seedAdmin?.ensured
+        ? ` | SeedAdmin: ${r.seedAdmin.email} (${
+            r.seedAdmin.created ? "created" : "updated"
+          }${r.seedAdmin.resetPassword ? ", password reset" : ""})`
+        : "";
 
-      if (!shared) {
-        // فولباك مضمون: نزّل الملف وافتح واتساب برسالة جاهزة
-        downloadBlob(blob, name);
-        openWhatsAppLink(phone, shareText);
-      }
+      const totals = r?.totals
+        ? `تمت الاستعادة. Collections: ${r.totals.collections} | Inserted: ${r.totals.inserted} | Deleted: ${r.totals.deleted}${seedInfo}`
+        : `تمت الاستعادة بنجاح.${seedInfo}`;
 
-      load();
+      setRestoreMsg(totals);
+      setRestoreFile(null);
+      if (fileRef.current) fileRef.current.value = "";
+
+      await load();
     } catch (e) {
-      // هنا بس لو حصل فشل في طلب /run-download نفسه
-      alert(
-        e?.response?.data?.message || "فشل في إنشاء/تنزيل النسخة الاحتياطية"
+      setRestoreErr(
+        e?.response?.data?.message || "فشل استعادة النسخة الاحتياطية"
       );
     } finally {
       setRunning(false);
     }
-  }
-
-  function mb(n) {
-    if (n == null) return "—";
-    const num = Number(n);
-    if (!Number.isFinite(num)) return String(n);
-    return `${num.toFixed(2)} م.ب`;
   }
 
   return (
@@ -170,27 +172,30 @@ export default function BackupPage() {
         ) : (
           <>
             <div className="grid sm:grid-cols-2 gap-2">
-              <Info label="حجم البيانات (data)" value={mb(data.dataSizeMB)} />
+              <Info
+                label="حجم البيانات (data)"
+                value={formatBytes(pickBytes("data"))}
+              />
               <Info
                 label="حجم التخزين (storage)"
-                value={mb(data.storageSizeMB)}
+                value={formatBytes(pickBytes("storage"))}
               />
               <Info
                 label="حجم الفهارس (indexes)"
-                value={mb(data.indexSizeMB)}
+                value={formatBytes(pickBytes("index"))}
               />
               <Info
                 label="إجمالي المساحة المستخدمة"
-                value={mb(data.totalSizeMB)}
+                value={formatBytes(pickBytes("total"))}
               />
               <Info
                 label="النسبة من الباقة"
                 value={
                   data.limitMB
-                    ? `${Number(data.usagePercent || 0).toFixed(1)}% من ${mb(
-                        data.limitMB
-                      )}`
-                    : `${Number(data.usagePercent || 0).toFixed(1)}%`
+                    ? `${Number(data.usagePercent || 0).toFixed(
+                        2
+                      )}% من ${formatBytes(Number(data.limitMB) * 1024 * 1024)}`
+                    : `${Number(data.usagePercent || 0).toFixed(2)}%`
                 }
               />
             </div>
@@ -204,16 +209,97 @@ export default function BackupPage() {
               </b>
             </div>
 
-            {/* إعداد رقم واتساب */}
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <label className="opacity-70">رقم واتساب (دولي بدون +):</label>
-              <input
-                value={wa}
-                onChange={(e) => saveWa(e.target.value)}
-                placeholder="مثال: 201234567890"
-                className="px-2 py-1 rounded-lg border dark:bg-gray-900"
-                style={{ direction: "ltr" }}
-              />
+            {/* Restore UI */}
+            <div className="p-3 rounded-xl bg-gray-50 dark:bg-gray-700/40 space-y-2">
+              <div className="font-semibold">استعادة من ملف Backup</div>
+
+              <div className="flex flex-wrap items-center gap-3 text-sm">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={ensureSeedAdmin}
+                    onChange={(e) => {
+                      setEnsureSeedAdmin(e.target.checked);
+                      if (!e.target.checked) setResetSeedPassword(false);
+                    }}
+                  />
+                  إنشاء/تأكيد Admin الطوارئ بعد الاستعادة
+                  (ADMIN_EMAIL/ADMIN_PASSWORD)
+                </label>
+
+                <label className="flex items-center gap-2 opacity-90">
+                  <input
+                    type="checkbox"
+                    checked={resetSeedPassword}
+                    onChange={(e) => setResetSeedPassword(e.target.checked)}
+                    disabled={!ensureSeedAdmin}
+                  />
+                  إعادة ضبط كلمة مرور Admin الطوارئ بعد الاستعادة
+                </label>
+
+                <label className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={restoreReplace}
+                    onChange={(e) => setRestoreReplace(e.target.checked)}
+                  />
+                  مسح البيانات قبل الاسترجاع (Replace)
+                </label>
+
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".gz,.json,.json.gz"
+                  className="hidden"
+                  onChange={(e) => {
+                    setRestoreMsg("");
+                    setRestoreErr("");
+                    const f = e.target.files?.[0] || null;
+                    setRestoreFile(f);
+                  }}
+                />
+
+                <button
+                  onClick={() => fileRef.current?.click()}
+                  className="px-3 py-2 rounded-xl bg-gray-200 dark:bg-gray-700"
+                  disabled={running}
+                >
+                  اختيار ملف
+                </button>
+
+                <div className="text-xs opacity-80">
+                  {restoreFile ? (
+                    <>
+                      الملف: <b>{restoreFile.name}</b> (
+                      {Math.round(restoreFile.size / 1024)} ك.ب)
+                    </>
+                  ) : (
+                    "لم يتم اختيار ملف"
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={restoreFromBackup}
+                  className="px-3 py-2 rounded-xl bg-emerald-600 text-white disabled:opacity-60"
+                  disabled={running || !restoreFile}
+                >
+                  {running ? "جارٍ الاستعادة…" : "استعادة الآن"}
+                </button>
+
+                {restoreMsg && (
+                  <div className="text-sm text-green-700">{restoreMsg}</div>
+                )}
+                {restoreErr && (
+                  <div className="text-sm text-red-600">{restoreErr}</div>
+                )}
+              </div>
+
+              <div className="text-xs opacity-70">
+                ملاحظة: الاستعادة تدعم ملفات النسخ التي تم تنزيلها من زر "نسخ +
+                تنزيل الآن".
+              </div>
             </div>
 
             <div className="flex items-center gap-2 mt-2">
@@ -233,32 +319,27 @@ export default function BackupPage() {
                 {running ? "جارٍ التحضير…" : "نسخ + تنزيل الآن"}
               </button>
 
-              <button
-                onClick={backupAndWhatsapp}
-                className="px-3 py-2 rounded-xl bg-green-600 text-white disabled:opacity-60"
-                disabled={running}
-              >
-                {running ? "جارٍ المشاركة…" : "نسخ + واتساب"}
-              </button>
-
-              {/* زر مسح كل البيانات (اختياري كما كان) */}
-              <button
+              {/* <button
                 onClick={async () => {
-                  if (!confirm("تحذير: سيتم مسح كل البيانات! هل أنت متأكد؟"))
-                    return;
-                  await API.delete("/backup/clear");
-                  await load();
+                  if (!confirm("تحذير: سيتم مسح كل البيانات! هل أنت متأكد؟")) return;
+                  try {
+                    await API.delete("/backup/clear");
+                    await load();
+                  } catch (e) {
+                    alert(e?.response?.data?.message || "فشل مسح البيانات");
+                  }
                 }}
                 className="px-3 py-2 rounded-xl bg-red-600 text-white"
+                disabled={running}
               >
                 مسح الكل
-              </button>
+              </button> */}
             </div>
 
             {data.latestFile && data.latestFileSizeMB != null && (
               <div className="text-sm text-[16px] opacity-80">
                 (آخر ملف مسجّل: <b>{data.latestFile}</b> —{" "}
-                {mb(data.latestFileSizeMB)})
+                {formatBytes(Number(data.latestFileSizeMB) * 1024 * 1024)})
               </div>
             )}
 

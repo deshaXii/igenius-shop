@@ -1,12 +1,12 @@
 // src/utils/statusOptions.js
-// قائمة الحالات المعتمدة في الباك إند
+// قائمة الحالات المخزّنة فعليًا في الباك إند (Repair.status)
 const statusOptions = [
   "في الانتظار",
   "جاري العمل",
   "مكتمل",
   "تم التسليم",
-  "مرفوض",
   "مرتجع",
+  "مرفوض",
 ];
 
 export default statusOptions;
