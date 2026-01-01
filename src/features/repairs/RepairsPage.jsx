@@ -12,7 +12,7 @@ import YmdLocal from "../../components/helpers/ymdLocal";
 import IsOldRepair from "../../components/helpers/isOldRepair";
 import hasNum from "../../components/helpers/hasNum";
 import handleWhatsAppMessage from "../../components/helpers/handleWhatsAppMessage";
-import IncludeNumberField from "../../components/helpers/IncludeNumberField";
+import IncludeNumberField from "../../components/helpers/includeNumberField";
 import handlePrintReceipt from "../../components/helpers/handlePrintReceipt";
 import AfterCompleteModal from "../../components/AfterCompleteModal";
 
