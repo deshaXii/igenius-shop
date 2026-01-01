@@ -1,4 +1,4 @@
-import getTrackingUrl from "./GetTrackingUrl";
+import getTrackingUrl from "./getTrackingUrl";
 
 // ======== رسالة واتساب ========
 export default function HandleWhatsAppMessage(rep) {
